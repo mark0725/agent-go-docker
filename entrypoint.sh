@@ -28,4 +28,37 @@ if [ "$(id -u)" = "0" ] && [ -n "${HOST_UID:-}" ]; then
     exec gosu node "$@"
 fi
 
+# 如果设置了 AGENT_ID，则在 /workspace 目录下创建 CLAUDE.md 文件
+if [ -n "${AGENT_ID:-}" ]; then
+    AGENT_DIR="${HOME}/.agents/${AGENT_ID}"
+    CLAUDE_MD="/workspace/CLAUDE.md"
+
+    {
+        # SOUL.md
+        if [ -f "${AGENT_DIR}/SOUL.md" ]; then
+            echo "<SOUL.md>"
+            cat "${AGENT_DIR}/SOUL.md"
+            echo "</SOUL.md>"
+            echo ""
+            echo ""
+        fi
+
+        # AGENTS.md
+        if [ -f "${AGENT_DIR}/AGENTS.md" ]; then
+            echo "<AGENTS.md>"
+            cat "${AGENT_DIR}/AGENTS.md"
+            echo "</AGENTS.md>"
+            echo ""
+            echo ""
+        fi
+
+        # MEMORY.md
+        if [ -f "${AGENT_DIR}/MEMORY.md" ]; then
+            echo "<MEMORY.md>"
+            cat "${AGENT_DIR}/MEMORY.md"
+            echo "</MEMORY.md>"
+        fi
+    } > "${CLAUDE_MD}"
+fi
+
 exec "$@"
