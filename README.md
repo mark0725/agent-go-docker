@@ -1,4 +1,4 @@
-# agent-cc-docker
+# agent-go-docker
 
 Claude Code 的 Docker 镜像，支持多架构（amd64/arm64），开箱即用的开发环境。
 
@@ -23,14 +23,14 @@ Python 3 + pip + venv
 ### 1. 安装 `cc` 脚本
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mark0725/agent-cc-docker/main/agent-cc -o ~/.local/bin/agent-cc
+curl -fsSL https://raw.githubusercontent.com/mark0725/agent-go-docker/main/agent-cc -o ~/.local/bin/agent-cc
 chmod +x ~/.local/bin/agent-cc
 ```
 
 或直接使用 `agent-cc`：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mark0725/agent-cc-docker/main/agent-cc -o ~/.local/bin/agent-cc
+curl -fsSL https://raw.githubusercontent.com/mark0725/agent-go-docker/main/agent-cc -o ~/.local/bin/agent-cc
 chmod +x ~/.local/bin/agent-cc
 ```
 
@@ -79,7 +79,7 @@ docker run -it --rm --network=host \
   -v "${HOME}/.claude:/home/node/.claude" \
   -v "${HOME}/.agents:/home/node/.agents" \
   -v "$(pwd):/workspace/$(pwd|sed 's/\//_/g')" \
-  ghcr.io/mark0725/agent-cc-docker:latest
+  ghcr.io/mark0725/agent-go-docker:latest
 ```
 
 ## 目录权限映射
@@ -100,9 +100,9 @@ GitHub Actions 自动构建并推送镜像到 GHCR：
 ## 镜像地址
 
 ```
-ghcr.io/mark0725/agent-cc-docker:latest
-ghcr.io/mark0725/agent-cc-docker:java8
-ghcr.io/mark0725/agent-cc-docker:java17
+ghcr.io/mark0725/agent-go-docker:latest
+ghcr.io/mark0725/agent-go-docker:java8
+ghcr.io/mark0725/agent-go-docker:java17
 ```
 
 ## License

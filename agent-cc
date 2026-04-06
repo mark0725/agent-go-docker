@@ -1,4 +1,4 @@
-IMAGE="ghcr.io/mark0725/agent-cc-docker:latest"
+IMAGE="ghcr.io/mark0725/agent-go-docker:latest"
 EXTRA_ARGS=""
 
 PROJECT_ID=`pwd|sed  's/\//_/g'`
@@ -10,11 +10,11 @@ mkdir -p ~/.agents
 while [ $# -gt 0 ]; do
     case "$1" in
         --java8)
-            IMAGE="ghcr.io/mark0725/agent-cc-docker:java8"
+            IMAGE="ghcr.io/mark0725/agent-go-docker:java8"
             shift
             ;;
         --java)
-            IMAGE="ghcr.io/mark0725/agent-cc-docker:java17"
+            IMAGE="ghcr.io/mark0725/agent-go-docker:java17"
             shift
             ;;
         *)
