@@ -67,6 +67,9 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 # ===== 安装 Claude Code =====
 RUN npm install -g @anthropic-ai/claude-code
 
+# ===== 安装 Codex =====
+RUN npm i -g @openai/codex
+
 # Unset http proxy
 RUN if [ -n "$HTTP_PROXY" ]; then \
         unset http_proxy; \

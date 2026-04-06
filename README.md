@@ -20,14 +20,7 @@ Python 3 + pip + venv
 
 ## 快速开始
 
-### 1. 安装 `cc` 脚本
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/mark0725/agent-go-docker/main/agent-cc -o ~/.local/bin/agent-cc
-chmod +x ~/.local/bin/agent-cc
-```
-
-或直接使用 `agent-cc`：
+### 1. 安装 `agent-cc` 脚本
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mark0725/agent-go-docker/main/agent-cc -o ~/.local/bin/agent-cc

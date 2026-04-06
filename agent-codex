@@ -1,0 +1,38 @@
+IMAGE="ghcr.io/mark0725/agent-go-docker:latest"
+EXTRA_ARGS=""
+
+PROJECT_ID=`pwd|sed  's/\//_/g'`
+AGENT_ID="${AGENT_ID:default}"
+
+mkdir -p ~/.agents
+
+# 解析选项
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --java8)
+            IMAGE="ghcr.io/mark0725/agent-go-docker:java8"
+            shift
+            ;;
+        --java)
+            IMAGE="ghcr.io/mark0725/agent-go-docker:java17"
+            shift
+            ;;
+        *)
+            EXTRA_ARGS="$EXTRA_ARGS $1"
+            shift
+            ;;
+    esac
+done
+
+docker run -it --rm --network=host \
+    --user 0 \
+    -e "HOST_UID=$(id -u)" \
+    -e "HOST_GID=$(id -g)" \
+    -e "HOME=/home/node" \
+    -e "AGENT_ID=${AGENT_ID}" \
+    -v node_home:/home/node \
+    -v "`pwd`:/workspace/${PROJECT_ID}" \
+    -v "${HOME}/.codex:/home/node/.codex" \
+    -v "${HOME}/.agents:/home/node/.agents" \
+    -w "/workspace/${PROJECT_ID}" \
+  "${IMAGE}" codex --dangerously-bypass-approvals-and-sandbox ---ask-for-approval never ${EXTRA_ARGS}
