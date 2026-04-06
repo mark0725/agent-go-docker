@@ -2,6 +2,9 @@ IMAGE="ghcr.io/mark0725/cc-docker:latest"
 EXTRA_ARGS=""
 
 PROJECT_ID=`pwd|sed  's/\//_/g'`
+AGENT_ID="${AGENT_ID:default}"
+
+mkdir -p ~/.agents
 
 # 解析选项
 while [ $# -gt 0 ]; do
@@ -21,16 +24,15 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-echo "==> 使用镜像: ${IMAGE}"
-echo "==> 宿主机 UID/GID: $(id -u)/$(id -g)"
-
-docker run -it --rm \
+docker run -it --rm --network=host \
     --user 0 \
     -e "HOST_UID=$(id -u)" \
     -e "HOST_GID=$(id -g)" \
     -e "HOME=/home/node" \
+    -e "AGENT_ID=${AGENT_ID}" \
     -v node_home:/home/node \
-    -v "`pwd`:/home/node/workspace/${PROJECT_ID}" \
+    -v "`pwd`:/workspace/${PROJECT_ID}" \
     -v "${HOME}/.claude:/home/node/.claude" \
+    -v "${HOME}/.agents:/home/node/.agents" \
     -w "/workspace/${PROJECT_ID}" \
   "${IMAGE}" claude --dangerously-skip-permissions --allowedTools "Edit,Write,Bash" ${EXTRA_ARGS}

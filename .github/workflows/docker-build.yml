@@ -18,11 +18,12 @@ jobs:
       matrix:
         include:
           - dockerfile: Dockerfile
-            tag: latest
+            primary_tag: latest
+            extra_tag: base
           - dockerfile: Dockerfile.java8
-            tag: java8
+            primary_tag: java8
           - dockerfile: Dockerfile.java17
-            tag: java17
+            primary_tag: java17
 
     permissions:
       contents: read
@@ -52,10 +53,11 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ matrix.tag }},enable={{is_default_branch}}
-            type=semver,pattern={{version}},suffix=-${{ matrix.tag }}
-            type=semver,pattern={{major}}.{{minor}},suffix=-${{ matrix.tag }}
-            type=sha,suffix=-${{ matrix.tag }},format=short
+            type=raw,value=${{ matrix.primary_tag }},enable={{is_default_branch}}
+            type=raw,value=${{ matrix.extra_tag }},enable={{is_default_branch}}
+            type=semver,pattern={{version}},suffix=-${{ matrix.primary_tag }}
+            type=semver,pattern={{major}}.{{minor}},suffix=-${{ matrix.primary_tag }}
+            type=sha,suffix=-${{ matrix.primary_tag }},format=short
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -66,5 +68,5 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.tag }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.tag }}
+          cache-from: type=gha,scope=${{ matrix.primary_tag }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.primary_tag }}

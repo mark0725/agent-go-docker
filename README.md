@@ -1,79 +1,109 @@
 # cc-docker
 
-Claude Code 的 Docker 镜像，支持多架构（amd64/arm64），提供多种语言环境变体。
+Claude Code 的 Docker 镜像，支持多架构（amd64/arm64），开箱即用的开发环境。
 
 ## 镜像变体
 
-| 变体 | Dockerfile | 说明 |
-|------|-----------|------|
-| `latest` | `Dockerfile` | Node.js 24 + Python 3 + Go + Claude Code |
-| `java8` | `Dockerfile.java8` | 上述 + Java 8 (Temurin) + Maven |
-| `java17` | `Dockerfile.java17` | 上述 + Java 17 (Temurin) + Maven |
+| 变体 | 基础镜像 | 内置语言环境 |
+|------|----------|--------------|
+| `latest` | `node:24-slim` | Node.js 24 + Python 3 + Go 1.26.1 |
+| `java8` | `node:24-slim` | Node.js 24 + Python 3 + Go 1.26.1 + Java 8 (Eclipse Temurin) + Maven 3.9.14 |
+| `java17` | `node:24-slim` | Node.js 24 + Python 3 + Go 1.26.1 + Java 17 (Eclipse Temurin) + Maven 3.9.14 |
 
-所有镜像基于 `node:24-slim`，包含 git、curl、vim、neovim、ripgrep、fd-find、jq 等常用开发工具。
+所有镜像内置开发工具链：
+
+```
+git · curl · wget · vim · neovim · ripgrep · fd-find · jq · tree · htop
+build-essential · openssh-client · ca-certificates · sudo
+Python 3 + pip + venv
+```
 
 ## 快速开始
 
-使用 `cc` 脚本一键启动 Claude Code：
+### 1. 安装 `cc` 脚本
 
 ```bash
-# 默认使用 latest 镜像
-./cc
-
-# 使用 Java 8 环境
-./cc --java8
-
-# 使用 Java 17 环境
-./cc --java
-
-# 传递额外参数给 claude
-./cc --dangerously-skip-permissions
+curl -fsSL https://raw.githubusercontent.com/mark0725/cc-docker/main/agent-cc -o ~/.local/bin/agent-cc
+chmod +x ~/.local/bin/agent-cc
 ```
 
-`cc` 脚本会自动：
-- 映射宿主机 UID/GID，容器内文件权限与宿主机一致
-- 挂载当前目录到容器内 workspace
-- 挂载 `~/.claude` 配置目录，保持会话持久化
-- 挂载 `node_home` 卷，持久化容器内 home 目录
+或直接使用 `agent-cc`：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mark0725/cc-docker/main/agent-cc -o ~/.local/bin/agent-cc
+chmod +x ~/.local/bin/agent-cc
+```
+
+### 2. 设置环境变量
+
+```bash
+export AGENT_ID="default"
+```
+
+### 3. 启动 Claude Code
+
+```bash
+# 默认 latest 镜像
+agent-cc
+
+# 使用 Java 8 环境
+agent-cc --java8
+
+# 使用 Java 17 环境
+agent-cc --java
+
+# 传递额外参数
+agent-cc -p '帮我写一个 Hello World'
+```
+
+## 持久化配置
+
+`cc` 脚本自动配置以下卷挂载：
+
+| 宿主机路径 | 容器内路径 | 用途 |
+|-----------|-----------|------|
+| `node_home` (Docker 卷) | `/home/node` | 用户 home 目录（含 Maven/Go 缓存） |
+| `~/.claude` | `/home/node/.claude` | Claude Code 配置与会话状态 |
+| `~/.agents` | `/home/node/.agents` | Agent 环境变量配置 |
 
 ## 手动运行
 
 ```bash
-docker run -it --rm \
+docker run -it --rm --network=host \
   --user 0 \
   -e "HOST_UID=$(id -u)" \
   -e "HOST_GID=$(id -g)" \
+  -e "AGENT_ID=default" \
   -e "HOME=/home/node" \
   -v node_home:/home/node \
-  -v "$(pwd):/home/node/workspace/$(pwd|sed 's/\//_/g')" \
   -v "${HOME}/.claude:/home/node/.claude" \
+  -v "${HOME}/.agents:/home/node/.agents" \
+  -v "$(pwd):/workspace/$(pwd|sed 's/\//_/g')" \
   ghcr.io/mark0725/cc-docker:latest
 ```
 
-## 本地构建
+## 目录权限映射
 
-```bash
-# 单架构构建
-docker build -t claude-code:latest .
+容器默认以 `node` 用户（UID 1000）运行。通过 `HOST_UID`/`HOST_GID` 环境变量，entrypoint 自动将容器内 UID/GID 调整为与宿主机一致，确保容器内创建的文件在宿主机上拥有正确的属主。
 
-# 多架构构建并推送（需要 buildx）
-bash build.sh
-```
 
 ## CI/CD
 
-推送到 `main` 分支或打 `v*` tag 时，GitHub Actions 自动构建并推送多架构镜像到 GHCR。
+GitHub Actions 自动构建并推送镜像到 GHCR：
 
-- `main` 分支推送 → 构建并打 `latest`/`java8`/`java17` tag
-- `v1.0.0` tag → 额外打 `1.0.0-latest`/`1.0.0-java8`/`1.0.0-java17` tag
-- PR → 仅构建验证，不推送镜像
+| 触发条件 | 推送 tags |
+|---------|----------|
+| 推送至 `main` 分支 | `latest` · `java8` · `java17` · `base` |
+| 打 `v1.0.0` tag | `1.0.0-latest` · `1.0.0-java8` · `1.0.0-java17` |
+| PR | 仅构建验证，不推送 |
 
-## 环境变量
+## 镜像地址
 
-| 变量 | 必需 | 说明 |
-|------|------|------|
-| `ANTHROPIC_API_KEY` | 是 | Anthropic API 密钥 |
-| `HOST_UID` / `HOST_GID` | 否 | 宿主机用户 UID/GID，用于文件权限映射 |
+```
+ghcr.io/mark0725/cc-docker:latest
+ghcr.io/mark0725/cc-docker:java8
+ghcr.io/mark0725/cc-docker:java17
+```
 
 ## License
 

@@ -1,6 +1,20 @@
 #!/bin/bash
 set -e
 
+# 加载 ~/.agents/.env 中的环境变量（如存在）
+if [ -f "${HOME}/.agents/.env" ]; then
+    set -a
+    source "${HOME}/.agents/.env"
+    set +a
+fi
+
+# 加载 ~/.agents/<AGENT_ID>/.env 中的环境变量（如存在）
+if [ -n "${AGENT_ID:-}" ] && [ -f "${HOME}/.agents/${AGENT_ID}/.env" ]; then
+    set -a
+    source "${HOME}/.agents/${AGENT_ID}/.env"
+    set +a
+fi
+
 # 以 root 运行且设置了 HOST_UID 时，将容器内 node 用户的 UID/GID 调整为与宿主机一致
 # 这样容器内创建的文件在宿主机上拥有正确的属主
 if [ "$(id -u)" = "0" ] && [ -n "${HOST_UID:-}" ]; then
