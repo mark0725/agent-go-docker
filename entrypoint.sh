@@ -32,6 +32,7 @@ fi
 if [ -n "${AGENT_ID:-}" ]; then
     AGENT_DIR="${HOME}/.agents/${AGENT_ID}"
     CLAUDE_MD="/workspace/CLAUDE.md"
+    AGENTS_MD="/workspace/AGENTS.md"
 
     {
         # SOUL.md
@@ -58,7 +59,11 @@ if [ -n "${AGENT_ID:-}" ]; then
             cat "${AGENT_DIR}/MEMORY.md"
             echo "</MEMORY>"
         fi
-    } > "${CLAUDE_MD}"
+    } > "${AGENTS_MD}"
+
+    if [ -f "${AGENTS_MD}" ]; then
+       cat "${AGENTS_MD}" > "${CLAUDE_MD}"
+    fi
 fi
 
 exec "$@"
