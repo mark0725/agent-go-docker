@@ -2,7 +2,6 @@ FROM ghcr.io/mark0725/agent-go-docker:latest
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# ===== Go (可选) =====
 ENV GOPROXY=https://proxy.golang.com.cn,direct
 ARG GO_VERSION=1.26.1
 RUN GOARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
