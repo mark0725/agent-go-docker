@@ -1,0 +1,36 @@
+ARG BASE_IMAGE_REGISTRY=ghcr.io/mark0725/agent-go-docker
+
+FROM ${BASE_IMAGE_REGISTRY}:latest
+
+ARG HTTP_PROXY
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV HTTPS_PROXY=${HTTP_PROXY}
+ENV PROXY_URL=${HTTP_PROXY}
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ===== Java 25 (Eclipse Temurin) =====
+ARG TARGETARCH
+RUN JAVA_ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+    case "$JAVA_ARCH" in \
+        amd64) JAVA_ARCH="x64" ;; \
+        arm64) JAVA_ARCH="aarch64" ;; \
+    esac && \
+    mkdir -p /usr/local/java && \
+    curl -fsSL --http1.1 "https://api.adoptium.net/v3/binary/latest/25/ga/linux/${JAVA_ARCH}/jdk/hotspot/normal/eclipse" \
+    | tar -xz -C /usr/local/java --strip-components=1
+ENV JAVA_HOME="/usr/local/java"
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+
+# ===== Maven =====
+ARG MAVEN_VERSION=3.9.14
+RUN curl -fsSL --http1.1 https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz \
+    | tar -xz -C /usr/local --transform 's|apache-maven-[^/]*|maven|'
+ENV MAVEN_HOME="/usr/local/maven"
+ENV PATH="${MAVEN_HOME}/bin:${PATH}"
+ENV M2_HOME="/home/node/.m2"
+
+# Unset http proxy
+ENV HTTP_PROXY=
+ENV HTTPS_PROXY=
+ENV PROXY_URL=

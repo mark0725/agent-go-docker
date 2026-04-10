@@ -1,8 +1,14 @@
-IMAGE="ghcr.io/mark0725/agent-go-docker:latest"
+#!/bin/bash
+
+IMAGE_REGISTRY="${AGENT_IMAGE_REGISTRY:-ghcr.io/mark0725/agent-go-docker}"
+
+IMAGE="${IMAGE_REGISTRY}:latest"
 EXTRA_ARGS=""
 
+echo ${IMAGE}
+
 PROJECT_ID=`pwd|sed  's/\//_/g'`
-AGENT_ID="${AGENT_ID:default}"
+AGENT_ID="${AGENT_ID:-default}"
 
 mkdir -p ~/.agents
 
@@ -10,23 +16,31 @@ mkdir -p ~/.agents
 while [ $# -gt 0 ]; do
     case "$1" in
         --java8)
-            IMAGE="ghcr.io/mark0725/agent-go-docker:java8"
+            IMAGE="${IMAGE_REGISTRY}:java8"
             shift
             ;;
         --java)
-            IMAGE="ghcr.io/mark0725/agent-go-docker:java17"
+            IMAGE="${IMAGE_REGISTRY}:java17"
             shift
             ;;
         --java17)
-            IMAGE="ghcr.io/mark0725/agent-go-docker:java17"
+            IMAGE="${IMAGE_REGISTRY}:java17"
+            shift
+            ;;
+        --java21)
+            IMAGE="${IMAGE_REGISTRY}:java21"
+            shift
+            ;;
+        --java25)
+            IMAGE="${IMAGE_REGISTRY}:java25"
             shift
             ;;
         --go)
-            IMAGE="ghcr.io/mark0725/agent-go-docker:go"
+            IMAGE="${IMAGE_REGISTRY}:go"
             shift
             ;;
         --rust)
-            IMAGE="ghcr.io/mark0725/agent-go-docker:rust"
+            IMAGE="${IMAGE_REGISTRY}:rust"
             shift
             ;;
         *)
