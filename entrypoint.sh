@@ -1,17 +1,15 @@
 #!/bin/bash
 set -e
 
-# 加载 ~/.agents/.env 中的环境变量（如存在）
-if [ -f "${HOME}/.agents/.env" ]; then
+if [ -f "${HOME}/.agents-hub/agents/.env" ]; then
     set -a
-    source "${HOME}/.agents/.env"
+    source "${HOME}/.agents-hub/agents/.env"
     set +a
 fi
 
-# 加载 ~/.agents/<AGENT_ID>/.env 中的环境变量（如存在）
-if [ -n "${AGENT_ID:-}" ] && [ -f "${HOME}/.agents/${AGENT_ID}/.env" ]; then
+if [ -n "${AGENT_ID:-}" ] && [ -f "${HOME}/.agents-hub/agents/${AGENT_ID}/.env" ]; then
     set -a
-    source "${HOME}/.agents/${AGENT_ID}/.env"
+    source "${HOME}/.agents-hub/agents/${AGENT_ID}/.env"
     set +a
 fi
 
@@ -30,7 +28,7 @@ fi
 
 # 如果设置了 AGENT_ID，则在 /workspace 目录下创建 CLAUDE.md 文件
 if [ -n "${AGENT_ID:-}" ]; then
-    AGENT_DIR="${HOME}/.agents/${AGENT_ID}"
+    AGENT_DIR="${HOME}/.agents-hub/agents/${AGENT_ID}"
     CLAUDE_MD="/workspace/CLAUDE.md"
     AGENTS_MD="/workspace/AGENTS.md"
 
