@@ -47,6 +47,9 @@ func main() {
 	mux.HandleFunc("DELETE /api/agents/{id}", handler.RemoveAgent)
 	mux.HandleFunc("POST /api/agents/{id}/restart", handler.RestartAgent)
 	mux.HandleFunc("GET /api/config", handler.GetConfig)
+	mux.HandleFunc("GET /api/lists/agents", handler.ListAgentIDs)
+	mux.HandleFunc("GET /api/lists/projects", handler.ListProjects)
+	mux.HandleFunc("GET /api/lists/workspaces", handler.ListWorkspaces)
 	mux.Handle("/proxy/{id}/", handler.ProxyAgent())
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {

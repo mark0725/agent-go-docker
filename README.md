@@ -137,6 +137,7 @@ docker run -d --name agent-run \
   --network=host \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v /data/work:/data/work \
+  -v ${HOME}/.agents-hub:/data/hub \
   -e "HOST_UID=$(id -u)" \
   -e "HOST_GID=$(id -g)" \
   -e "AGENT_ID=default" \
@@ -189,6 +190,28 @@ Once enabled, all `/api/*`, `/proxy/*`, and UI endpoints require authentication.
 - `RUNNER_AUTH_TOKEN`: Shared token for accessing runner pages and APIs, default empty (no authentication). See "Authentication" above.
 - `PROJECT_ROOT`: Project workspace root directory, default `/data/work`.
 - `PROJECT_HOME`: Overrides `${PROJECT_ROOT}/${PROJECT_ID}`, forcing the use of a single workspace directory.
+
+### Workspace Directory Structure
+
+```
+/data/work/
+  └── {PROJECT_ID}/              # One directory per project
+        ├── main/                 # Default workspace (WORKSPACE_ID=main)
+        └── {WORKSPACE_ID}/      # Git worktree, each a separate workspace
+              └── ...             # Project source files
+```
+
+Each agent container mounts `/data/work/{PROJECT_ID}/{WORKSPACE_ID}` as its working directory (`-w`). `WORKSPACE_ID` defaults to `main`; additional workspaces correspond to git worktrees within the same project.
 - `CLAUDE_HOME` / `CODEX_HOME` / `AGENTS_HOME` / `AGENTS_HUB`: Host-side directories mounted into agent containers at `/home/node/.{claude,codex,agents,agents-hub}`. Defaults are based on the runner user's `$HOME`.
 - `PORT_RANGE_START` / `PORT_RANGE_END`: Assignable port range, default `7681-7780`.
 - `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, `HTTP_PROXY`, `HTTPS_PROXY`, `PROXY_URL`: Passed through to agent containers.
+
+### Form Field Directory Sources
+
+The create/edit agent form provides autocomplete suggestions for the following fields:
+
+- **AGENT_ID**: Lists directory names under `/data/hub/agents` on the host.
+- **Project ID**: Lists directory names under `PROJECT_ROOT` (default `/data/work`) on the host.
+- **Workspace ID**: Lists directory names under `PROJECT_ROOT/{projectId}` on the host; updated dynamically as Project ID changes.
+
+All three fields also accept free-text input.

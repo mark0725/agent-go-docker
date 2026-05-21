@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/mark0725/agent-go-docker/runner/internal/docker"
@@ -164,6 +165,42 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		AnthropicBaseURL:  cfg.AnthropicBaseURL,
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) ListAgentIDs(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, ListResponse{Items: listDirs("/data/hub/agents")})
+}
+
+func (h *Handler) ListProjects(w http.ResponseWriter, r *http.Request) {
+	cfg := h.manager.Config()
+	writeJSON(w, http.StatusOK, ListResponse{Items: listDirs(cfg.ProjectRoot)})
+}
+
+func (h *Handler) ListWorkspaces(w http.ResponseWriter, r *http.Request) {
+	cfg := h.manager.Config()
+	projectID := r.URL.Query().Get("projectId")
+	if projectID == "" {
+		writeJSON(w, http.StatusOK, ListResponse{})
+		return
+	}
+	dir := cfg.ProjectRoot + "/" + projectID
+	writeJSON(w, http.StatusOK, ListResponse{Items: listDirs(dir)})
+}
+
+// listDirs returns the names of immediate subdirectories under dir.
+// Returns an empty slice on error.
+func listDirs(dir string) []string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() && !strings.HasPrefix(e.Name(), ".") {
+			names = append(names, e.Name())
+		}
+	}
+	return names
 }
 
 func (h *Handler) ProxyAgent() http.HandlerFunc {

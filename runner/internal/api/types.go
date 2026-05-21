@@ -45,6 +45,10 @@ type ListAgentsResponse struct {
 	Agents []AgentResponse `json:"agents"`
 }
 
+type ListResponse struct {
+	Items []string `json:"items"`
+}
+
 type ErrorResponse struct {
 	Error string `json:"error"`
 }

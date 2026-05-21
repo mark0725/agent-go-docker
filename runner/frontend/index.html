@@ -222,7 +222,7 @@
                     <div class="row-line"><span class="k">Image</span><span class="v" x-text="selectedAgent.image || '—'"></span></div>
                     <div class="row-line"><span class="k">AGENT_ID</span><span class="v" x-text="selectedAgent.agentId || '—'"></span></div>
                     <div class="row-line"><span class="k">Project ID</span><span class="v" x-text="selectedAgent.projectId || '—'"></span></div>
-                    <div class="row-line"><span class="k">Workspace ID</span><span class="v" x-text="selectedAgent.workspaceId || '(none)'"></span></div>
+                    <div class="row-line"><span class="k">Worktree</span><span class="v" x-text="selectedAgent.workspaceId || '(none)'"></span></div>
                     <div class="row-line"><span class="k">Container -w</span><span class="v" x-text="containerWorkdir(selectedAgent)"></span></div>
                     <div class="row-line"><span class="k">PROJECT_HOME</span><span class="v" x-text="selectedAgent.projectHome || '—'"></span></div>
                     <div class="row-line"><span class="k">CLAUDE_HOME</span><span class="v" x-text="selectedAgent.claudeHome || '—'"></span></div>
@@ -269,20 +269,37 @@
                         </div>
                         <div class="field">
                             <label>AGENT_ID</label>
-                            <input type="text" x-model="form.agentId"
+                            <input type="text" x-model="form.agentId" list="dl-agents"
                                    :placeholder="cfg.agentId || 'default'" />
+                            <datalist id="dl-agents">
+                                <template x-for="item in listAgentIds" :key="item">
+                                    <option :value="item"></option>
+                                </template>
+                            </datalist>
                             <div class="hint">Sets <code>AGENT_ID</code> env in the container. Blank = runner default (<code x-text="cfg.agentId || 'default'"></code>).</div>
                         </div>
                     </div>
                     <div class="row">
                         <div class="field">
                             <label>Project ID</label>
-                            <input type="text" x-model="form.projectId" placeholder="defaults to host path" />
+                            <input type="text" x-model="form.projectId" list="dl-projects"
+                                   placeholder="defaults to host path"
+                                   @input="fetchWorkspaces()" />
+                            <datalist id="dl-projects">
+                                <template x-for="item in listProjects" :key="item">
+                                    <option :value="item"></option>
+                                </template>
+                            </datalist>
                         </div>
                         <div class="field">
-                            <label>Workspace ID</label>
-                            <input type="text" x-model="form.workspaceId"
+                            <label>Workspace ID (git worktree name)</label>
+                            <input type="text" x-model="form.workspaceId" list="dl-workspaces"
                                    placeholder="optional; narrows container -w to /workspace/${PROJECT_ID}/${WORKSPACE_ID}" />
+                            <datalist id="dl-workspaces">
+                                <template x-for="item in listWorkspaces" :key="item">
+                                    <option :value="item"></option>
+                                </template>
+                            </datalist>
                         </div>
                     </div>
                     <div class="field">
@@ -381,6 +398,10 @@ function agentApp() {
 
         variants: ['default', 'java8', 'java17', 'java21', 'java25', 'go', 'rust'],
 
+        listAgentIds: [],
+        listProjects: [],
+        listWorkspaces: [],
+
         modalOpen: false,
         modalMode: 'create',
         submitting: false,
@@ -425,7 +446,7 @@ function agentApp() {
         async init() {
             this.form = this.blankForm();
             await this.loadConfig();
-            await this.refreshAgents();
+            await Promise.all([this.refreshAgents(), this.fetchListOptions()]);
             this.refreshTimer = setInterval(() => this.refreshAgents(), 5000);
         },
 
@@ -438,6 +459,30 @@ function agentApp() {
                 }
             } catch (e) {
                 console.error('load config error:', e);
+            }
+        },
+
+        async fetchListOptions() {
+            try {
+                const [r1, r2] = await Promise.all([
+                    fetch('/api/lists/agents'),
+                    fetch('/api/lists/projects'),
+                ]);
+                if (r1.ok) this.listAgentIds = (await r1.json()).items || [];
+                if (r2.ok) this.listProjects = (await r2.json()).items || [];
+            } catch (e) {
+                console.error('fetch list options error:', e);
+            }
+        },
+
+        async fetchWorkspaces() {
+            const pid = (this.form.projectId || '').trim();
+            if (!pid) { this.listWorkspaces = []; return; }
+            try {
+                const resp = await fetch('/api/lists/workspaces?projectId=' + encodeURIComponent(pid));
+                if (resp.ok) this.listWorkspaces = (await resp.json()).items || [];
+            } catch (e) {
+                this.listWorkspaces = [];
             }
         },
 
@@ -497,6 +542,7 @@ function agentApp() {
 
         openCreate() {
             this.form = this.blankForm();
+            this.listWorkspaces = [];
             this.advancedOpen = true;
             this.modalMode = 'create';
             this.modalOpen = true;
@@ -519,6 +565,7 @@ function agentApp() {
                 anthropicAuthToken: '',
                 anthropicBaseUrl: '',
             };
+            this.fetchWorkspaces();
             this.advancedOpen = true;
             this.modalMode = 'edit';
             this.modalOpen = true;
