@@ -328,7 +328,7 @@ func (m *Manager) CreateAgent(ctx context.Context, opts CreateAgentOpts) (*Agent
 	// args — anything after `image` is a positional arg to the container
 	// command, not a docker flag.
 	if paths.ClaudeConfig != "" {
-		args = append(args, "-v", paths.ClaudeConfig+":/home/node/.claude.json:ro")
+		args = append(args, "-v", paths.ClaudeConfig+":/home/node/.claude.json")
 	}
 	args = append(args,
 		"-w", containerWorkspace,
