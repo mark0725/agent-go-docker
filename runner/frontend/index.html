@@ -702,7 +702,7 @@ function agentApp() {
         openCreate() {
             this.form = this.blankForm();
             this.listWorkspaces = [];
-            this.advancedOpen = true;
+            this.advancedOpen = false;
             this.modalMode = 'create';
             this.modalOpen = true;
         },
@@ -727,7 +727,7 @@ function agentApp() {
                 extraEnv: (agent.extraEnv || []).map(e => ({ key: e.key, value: e.value, _invalid: false })),
             };
             this.fetchWorkspaces();
-            this.advancedOpen = true;
+            this.advancedOpen = false;
             this.modalMode = 'edit';
             this.modalOpen = true;
         },
