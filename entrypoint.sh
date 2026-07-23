@@ -42,9 +42,6 @@ if [ -n "${AGENT_INIT_FILE:-}" ]; then
         echo "[entrypoint] running AGENT_INIT_FILE: ${AGENT_INIT_FILE}"
         # shellcheck source=/dev/null
         . "${AGENT_INIT_FILE}"
-    else
-        echo "[entrypoint] ERROR: AGENT_INIT_FILE set but not found: ${AGENT_INIT_FILE}" >&2
-        exit 1
     fi
 fi
 
