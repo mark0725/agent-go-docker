@@ -7,6 +7,7 @@
     <script defer src="/alpine.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        [x-cloak] { display: none !important; }
         html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f0f; color: #e0e0e0; }
 
         .app { display: grid; grid-template-columns: 300px 1fr; height: 100vh; transition: grid-template-columns 0.18s ease; }
@@ -145,14 +146,52 @@
         .modal-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
         .modal-footer { padding: 12px 20px 16px; display: flex; justify-content: flex-end; gap: 8px; }
         .field label { display: block; font-size: 12px; color: #aaa; margin-bottom: 4px; }
-        .field input, .field select, .field textarea {
+        .field input, .field textarea {
             width: 100%; padding: 8px 10px; border-radius: 6px;
             border: 1px solid #3a3a5e; background: #0f0f1a; color: #e0e0e0;
             font-size: 13px; outline: none; font-family: inherit;
         }
-        .field input:focus, .field select:focus, .field textarea:focus { border-color: #6c5ce7; }
+        .field input:focus, .field textarea:focus { border-color: #6c5ce7; }
         .field .hint { font-size: 11px; color: #666; margin-top: 4px; }
         .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+        /* Custom select */
+        .custom-select { position: relative; }
+        .select-trigger { width: 100%; min-height: 34px; padding: 7px 9px 7px 11px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid #3a3a5e; border-radius: 7px; background: linear-gradient(180deg, #151525 0%, #0f0f1a 100%); color: #e8e8ef; font: 500 13px/1.4 inherit; text-align: left; cursor: pointer; outline: none; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+        .select-trigger:hover { border-color: #55557a; background: #17172a; }
+        .select-trigger:focus-visible, .select-trigger.open { border-color: #7c6cf2; box-shadow: 0 0 0 3px rgba(108,92,231,.18); }
+        .select-trigger:disabled { opacity: .55; cursor: not-allowed; background: #11111c; }
+        .select-trigger:disabled:hover { border-color: #3a3a5e; }
+        .select-chevron { width: 16px; height: 16px; flex: none; color: #9292ad; transition: transform .18s ease, color .15s ease; }
+        .select-trigger.open .select-chevron { transform: rotate(180deg); color: #b9b0ff; }
+        .select-menu { position: absolute; z-index: 130; top: calc(100% + 6px); left: 0; right: 0; max-height: 260px; overflow-y: auto; padding: 5px; border: 1px solid #393957; border-radius: 9px; background: rgba(25,25,45,.98); box-shadow: 0 14px 36px rgba(0,0,0,.48), 0 0 0 1px rgba(255,255,255,.025) inset; backdrop-filter: blur(12px); }
+        .select-search-wrap { position: relative; padding: 2px 2px 6px; }
+        .select-search-icon { position: absolute; left: 11px; top: 10px; width: 14px; height: 14px; color: #777793; pointer-events: none; }
+        .field .select-search {
+            padding: 7px 9px 7px 30px; border-color: #343450; border-radius: 6px;
+            background: #111120; font-size: 12px;
+        }
+        .field .select-search:focus { border-color: #6c5ce7; box-shadow: 0 0 0 2px rgba(108,92,231,.12); }
+        .select-empty { padding: 14px 9px; color: #77778d; font-size: 12px; text-align: center; }
+        .select-option { width: 100%; padding: 7px 9px; border: 0; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: transparent; color: #cfcfda; font: 13px/1.35 inherit; text-align: left; cursor: pointer; outline: none; }
+        .select-option > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .select-option:hover, .select-option.active { background: #303052; color: #fff; }
+        .select-option.selected { color: #c4bcff; font-weight: 600; }
+        .select-check { width: 15px; color: #8d7ff5; font-weight: 700; text-align: center; }
+        .combo-input-wrap { position: relative; }
+        .field .combo-input { padding-right: 34px; }
+        .combo-toggle {
+            position: absolute; top: 1px; right: 1px; bottom: 1px; width: 32px;
+            display: flex; align-items: center; justify-content: center;
+            border: 0; border-left: 1px solid #292943; border-radius: 0 6px 6px 0;
+            background: transparent; color: #9292ad; cursor: pointer;
+        }
+        .combo-toggle:hover { color: #c4bcff; background: rgba(108,92,231,.1); }
+        .combo-toggle .select-chevron { width: 15px; height: 15px; }
+        .combo-toggle.open .select-chevron { transform: rotate(180deg); color: #b9b0ff; }
+        .select-placeholder { color: #666; font-weight: 400; }
+        .select-menu::-webkit-scrollbar { width: 5px; }
+        .select-menu::-webkit-scrollbar-thumb { background: #444467; border-radius: 3px; }
         .btn-primary {
             background: #6c5ce7; color: #fff; border: none; padding: 8px 16px;
             border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;
@@ -320,49 +359,249 @@
                     <div class="row">
                         <div class="field">
                             <label>Image variant</label>
-                            <select x-model="form.variant">
-                                <option value="default">default</option>
-                                <option value="java8">java8</option>
-                                <option value="java17">java17</option>
-                                <option value="java21">java21</option>
-                                <option value="java25">java25</option>
-                                <option value="go">go</option>
-                                <option value="rust">rust</option>
-                            </select>
+                            <div class="custom-select"
+                                 x-data="{
+                                     open: false,
+                                     active: 0,
+                                     query: '',
+                                     filteredVariants() {
+                                         const query = this.query.trim().toLowerCase();
+                                         return query ? this.variants.filter(v => v.toLowerCase().includes(query)) : this.variants;
+                                     },
+                                     openMenu() {
+                                         this.query = '';
+                                         this.active = Math.max(0, this.variants.indexOf(this.form.variant));
+                                         this.open = true;
+                                     },
+                                     move(delta) {
+                                         if (!this.open) this.openMenu();
+                                         const options = this.filteredVariants();
+                                         if (!options.length) return;
+                                         this.active = (this.active + delta + options.length) % options.length;
+                                     },
+                                     choose(variant) {
+                                         if (!variant) return;
+                                         this.form.variant = variant;
+                                         this.open = false;
+                                     }
+                                 }"
+                                 @click.outside="open = false">
+                                <button type="button" class="select-trigger"
+                                        :class="{ open: open }" aria-haspopup="listbox"
+                                        :aria-expanded="open" aria-controls="variant-options"
+                                        @click="if (open) { open = false } else { openMenu(); $nextTick(() => $refs.variantSearch.focus()) }"
+                                        @keydown.down.prevent="move(1)" @keydown.up.prevent="move(-1)"
+                                        @keydown.home.prevent="openMenu(); active = 0"
+                                        @keydown.end.prevent="openMenu(); active = filteredVariants().length - 1"
+                                        @keydown.enter.prevent="open ? choose(filteredVariants()[active]) : (openMenu(), $nextTick(() => $refs.variantSearch.focus()))"
+                                        @keydown.space.prevent="open ? choose(filteredVariants()[active]) : (openMenu(), $nextTick(() => $refs.variantSearch.focus()))"
+                                        @keydown.escape.stop="open = false">
+                                    <span x-text="form.variant"></span>
+                                    <svg class="select-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                        <path d="m6 8 4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+                                <div id="variant-options" class="select-menu" role="listbox"
+                                     x-show="open" x-cloak x-transition.opacity.scale.origin.top.duration.100ms>
+                                    <div class="select-search-wrap">
+                                        <svg class="select-search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                            <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.6"/>
+                                            <path d="m12.5 12.5 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                                        </svg>
+                                        <input x-ref="variantSearch" class="select-search" type="search"
+                                               x-model="query" placeholder="Search variants…"
+                                               autocomplete="off" aria-label="Search image variants"
+                                               @input="active = 0"
+                                               @keydown.down.prevent="move(1)"
+                                               @keydown.up.prevent="move(-1)"
+                                               @keydown.enter.prevent="choose(filteredVariants()[active])"
+                                               @keydown.escape.stop.prevent="open = false; $nextTick(() => $el.closest('.custom-select').querySelector('.select-trigger').focus())" />
+                                    </div>
+                                    <template x-for="(variant, index) in filteredVariants()" :key="variant">
+                                        <button type="button" class="select-option" role="option"
+                                                :class="{ selected: form.variant === variant, active: active === index }"
+                                                :aria-selected="form.variant === variant"
+                                                @mouseenter="active = index" @click="choose(variant)">
+                                            <span x-text="variant"></span>
+                                            <span class="select-check" x-show="form.variant === variant" aria-hidden="true">✓</span>
+                                        </button>
+                                    </template>
+                                    <div class="select-empty" x-show="filteredVariants().length === 0">No matching variants</div>
+                                </div>
+                            </div>
                         </div>
                         <div class="field">
                             <label>AGENT_ID</label>
-                            <input type="text" x-model="form.agentId" list="dl-agents"
-                                   :placeholder="cfg.agentId || 'default'" />
-                            <datalist id="dl-agents">
-                                <template x-for="item in listAgentIds" :key="item">
-                                    <option :value="item"></option>
-                                </template>
-                            </datalist>
+                            <div class="custom-select"
+                                 x-data="{
+                                     open: false,
+                                     active: 0,
+                                     matches() {
+                                         const query = form.agentId.trim().toLowerCase();
+                                         return query ? listAgentIds.filter(v => v.toLowerCase().includes(query)) : listAgentIds;
+                                     },
+                                     move(delta) {
+                                         this.open = true;
+                                         const options = this.matches();
+                                         if (!options.length) return;
+                                         this.active = (this.active + delta + options.length) % options.length;
+                                     },
+                                     choose(value) {
+                                         if (!value) return;
+                                         form.agentId = value;
+                                         this.open = false;
+                                     }
+                                 }"
+                                 @click.outside="open = false">
+                                <div class="combo-input-wrap">
+                                    <input class="combo-input" type="text" x-model="form.agentId"
+                                           :placeholder="cfg.agentId || 'default'"
+                                           autocomplete="off" role="combobox"
+                                           :aria-expanded="open" aria-controls="agent-id-options"
+                                           @focus="open = true; active = 0"
+                                           @input="open = true; active = 0"
+                                           @keydown.down.prevent="move(1)"
+                                           @keydown.up.prevent="move(-1)"
+                                           @keydown.enter.prevent="choose(matches()[active])"
+                                           @keydown.escape.stop="open = false" />
+                                    <button type="button" class="combo-toggle" :class="{ open: open }"
+                                            tabindex="-1" aria-label="Show AGENT_ID options"
+                                            @click="open = !open; if (open) $nextTick(() => $el.previousElementSibling.focus())">
+                                        <svg class="select-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                            <path d="m6 8 4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div id="agent-id-options" class="select-menu" role="listbox"
+                                     x-show="open" x-cloak x-transition.opacity.scale.origin.top.duration.100ms>
+                                    <template x-for="(item, index) in matches()" :key="item">
+                                        <button type="button" class="select-option" role="option"
+                                                :class="{ selected: form.agentId === item, active: active === index }"
+                                                :aria-selected="form.agentId === item"
+                                                @mouseenter="active = index" @mousedown.prevent @click="choose(item)">
+                                            <span x-text="item"></span>
+                                            <span class="select-check" x-show="form.agentId === item" aria-hidden="true">✓</span>
+                                        </button>
+                                    </template>
+                                    <div class="select-empty" x-show="matches().length === 0">No matching agents — custom value is allowed</div>
+                                </div>
+                            </div>
                             <div class="hint">Sets <code>AGENT_ID</code> env in the container. Blank = runner default (<code x-text="cfg.agentId || 'default'"></code>).</div>
                         </div>
                     </div>
                     <div class="row">
                         <div class="field">
                             <label>Project ID</label>
-                            <input type="text" x-model="form.projectId" list="dl-projects"
-                                   placeholder="defaults to host path"
-                                   @input="fetchWorkspaces()" />
-                            <datalist id="dl-projects">
-                                <template x-for="item in listProjects" :key="item">
-                                    <option :value="item"></option>
-                                </template>
-                            </datalist>
+                            <div class="custom-select"
+                                 x-data="{
+                                     open: false,
+                                     active: 0,
+                                     query: '',
+                                     matches() {
+                                         const query = this.query.trim().toLowerCase();
+                                         return query ? listProjects.filter(v => v.toLowerCase().includes(query)) : listProjects;
+                                     },
+                                     openMenu() {
+                                         this.query = '';
+                                         this.active = Math.max(0, listProjects.indexOf(form.projectId));
+                                         this.open = true;
+                                     },
+                                     move(delta) {
+                                         const options = this.matches();
+                                         if (!options.length) return;
+                                         this.active = (this.active + delta + options.length) % options.length;
+                                     },
+                                     choose(value) {
+                                         if (!value) return;
+                                         form.projectId = value;
+                                         form.workspaceId = '';
+                                         this.open = false;
+                                         fetchWorkspaces();
+                                     }
+                                 }"
+                                 @click.outside="open = false">
+                                <button type="button" class="select-trigger" :class="{ open: open }"
+                                        aria-haspopup="listbox" :aria-expanded="open" aria-controls="project-id-options"
+                                        @click="if (open) { open = false } else { openMenu(); $nextTick(() => $refs.projectSearch.focus()) }"
+                                        @keydown.down.prevent="if (!open) openMenu(); move(1)"
+                                        @keydown.up.prevent="if (!open) openMenu(); move(-1)"
+                                        @keydown.enter.prevent="open ? choose(matches()[active]) : (openMenu(), $nextTick(() => $refs.projectSearch.focus()))"
+                                        @keydown.escape.stop="open = false">
+                                    <span :class="{ 'select-placeholder': !form.projectId }"
+                                          x-text="form.projectId || 'Select project…'"></span>
+                                    <svg class="select-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                        <path d="m6 8 4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+                                <div id="project-id-options" class="select-menu" role="listbox"
+                                     x-show="open" x-cloak x-transition.opacity.scale.origin.top.duration.100ms>
+                                    <div class="select-search-wrap">
+                                        <svg class="select-search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                            <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.6"/>
+                                            <path d="m12.5 12.5 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                                        </svg>
+                                        <input x-ref="projectSearch" class="select-search" type="search"
+                                               x-model="query" placeholder="Search projects…"
+                                               autocomplete="off" aria-label="Search projects"
+                                               @input="active = 0"
+                                               @keydown.down.prevent="move(1)"
+                                               @keydown.up.prevent="move(-1)"
+                                               @keydown.enter.prevent="choose(matches()[active])"
+                                               @keydown.escape.stop.prevent="open = false" />
+                                    </div>
+                                    <template x-for="(item, index) in matches()" :key="item">
+                                        <button type="button" class="select-option" role="option"
+                                                :class="{ selected: form.projectId === item, active: active === index }"
+                                                :aria-selected="form.projectId === item"
+                                                @mouseenter="active = index" @click="choose(item)">
+                                            <span x-text="item"></span>
+                                            <span class="select-check" x-show="form.projectId === item" aria-hidden="true">✓</span>
+                                        </button>
+                                    </template>
+                                    <div class="select-empty" x-show="matches().length === 0">No matching projects</div>
+                                </div>
+                            </div>
                         </div>
                         <div class="field">
                             <label>Workspace ID (git worktree name)</label>
-                            <input type="text" x-model="form.workspaceId" list="dl-workspaces"
-                                   placeholder="optional; narrows container -w to /workspace/${PROJECT_ID}/${WORKSPACE_ID}" />
-                            <datalist id="dl-workspaces">
-                                <template x-for="item in listWorkspaces" :key="item">
-                                    <option :value="item"></option>
-                                </template>
-                            </datalist>
+                            <div class="custom-select" x-data="{ open: false, active: 0 }"
+                                 @click.outside="open = false">
+                                <button type="button" class="select-trigger" :class="{ open: open }"
+                                        :disabled="!form.projectId" aria-haspopup="listbox"
+                                        :aria-expanded="open" aria-controls="workspace-id-options"
+                                        @click="open = !open; active = Math.max(0, listWorkspaces.indexOf(form.workspaceId))"
+                                        @keydown.down.prevent="open = true; active = listWorkspaces.length ? (active + 1) % listWorkspaces.length : 0"
+                                        @keydown.up.prevent="open = true; active = listWorkspaces.length ? (active - 1 + listWorkspaces.length) % listWorkspaces.length : 0"
+                                        @keydown.enter.prevent="if (open && listWorkspaces[active]) { form.workspaceId = listWorkspaces[active]; open = false }"
+                                        @keydown.escape.stop="open = false">
+                                    <span :class="{ 'select-placeholder': !form.workspaceId }"
+                                          x-text="form.workspaceId || (form.projectId ? 'Select workspace…' : 'Select a project first')"></span>
+                                    <svg class="select-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                        <path d="m6 8 4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+                                <div id="workspace-id-options" class="select-menu" role="listbox"
+                                     x-show="open" x-cloak x-transition.opacity.scale.origin.top.duration.100ms>
+                                    <button type="button" class="select-option"
+                                            :class="{ selected: !form.workspaceId }"
+                                            @click="form.workspaceId = ''; open = false">
+                                        <span>None (project root)</span>
+                                        <span class="select-check" x-show="!form.workspaceId" aria-hidden="true">✓</span>
+                                    </button>
+                                    <template x-for="(item, index) in listWorkspaces" :key="item">
+                                        <button type="button" class="select-option" role="option"
+                                                :class="{ selected: form.workspaceId === item, active: active === index }"
+                                                :aria-selected="form.workspaceId === item"
+                                                @mouseenter="active = index"
+                                                @click="form.workspaceId = item; open = false">
+                                            <span x-text="item"></span>
+                                            <span class="select-check" x-show="form.workspaceId === item" aria-hidden="true">✓</span>
+                                        </button>
+                                    </template>
+                                    <div class="select-empty" x-show="listWorkspaces.length === 0">No workspaces found</div>
+                                </div>
+                            </div>
+                            <div class="hint">Optional; narrows container workdir to the selected git worktree.</div>
                         </div>
                     </div>
                     <div class="field">
