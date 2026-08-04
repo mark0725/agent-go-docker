@@ -192,6 +192,10 @@
         .select-placeholder { color: #666; font-weight: 400; }
         .select-menu::-webkit-scrollbar { width: 5px; }
         .select-menu::-webkit-scrollbar-thumb { background: #444467; border-radius: 3px; }
+        .type-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border: 1px solid #343450; border-radius: 8px; background: #0f0f1a; }
+        .type-option { padding: 7px 10px; border: 0; border-radius: 5px; background: transparent; color: #8888a1; font: 500 13px/1.3 inherit; cursor: pointer; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
+        .type-option:hover { color: #ddd; background: rgba(255,255,255,.04); }
+        .type-option.active { color: #fff; background: #39345f; box-shadow: 0 1px 4px rgba(0,0,0,.28); }
         .btn-primary {
             background: #6c5ce7; color: #fff; border: none; padding: 8px 16px;
             border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;
@@ -263,6 +267,7 @@
                             <template x-if="agent.variant">
                                 <span> · <span x-text="agent.variant"></span></span>
                             </template>
+                            <span> · <span x-text="agent.agentType || 'claude'"></span></span>
                             <template x-if="agent.agentId">
                                 <span> · <span x-text="agent.agentId"></span></span>
                             </template>
@@ -289,6 +294,7 @@
                     <div class="terminal-title">
                         <span class="name" x-text="selectedAgent.name"></span>
                         <span class="badge" x-text="selectedAgent.status"></span>
+                        <span class="badge" x-text="selectedAgent.agentType || 'claude'"></span>
                         <template x-if="selectedAgent.variant">
                             <span class="badge" x-text="selectedAgent.variant"></span>
                         </template>
@@ -312,6 +318,7 @@
                 <div class="details" :class="{ collapsed: !detailsOpen }">
                     <div class="row-line"><span class="k">Image</span><span class="v" x-text="selectedAgent.image || '—'"></span></div>
                     <div class="row-line"><span class="k">AGENT_ID</span><span class="v" x-text="selectedAgent.agentId || '—'"></span></div>
+                    <div class="row-line"><span class="k">AGENT_TYPE</span><span class="v" x-text="selectedAgent.agentType || 'claude'"></span></div>
                     <div class="row-line"><span class="k">Project ID</span><span class="v" x-text="selectedAgent.projectId || '—'"></span></div>
                     <div class="row-line"><span class="k">Worktree</span><span class="v" x-text="selectedAgent.workspaceId || '(none)'"></span></div>
                     <div class="row-line"><span class="k">Container -w</span><span class="v" x-text="containerWorkdir(selectedAgent)"></span></div>
@@ -321,7 +328,7 @@
                     <div class="row-line"><span class="k">CODEX_HOME</span><span class="v" x-text="selectedAgent.codexHome || '—'"></span></div>
                     <div class="row-line"><span class="k">AGENTS_HOME</span><span class="v" x-text="selectedAgent.agentsHome || '—'"></span></div>
                     <div class="row-line"><span class="k">AGENTS_HUB</span><span class="v" x-text="selectedAgent.agentsHub || '—'"></span></div>
-                    <div class="row-line"><span class="k">Claude args</span><span class="v" x-text="(selectedAgent.claudeArgs || []).join(' ') || '(default)'"></span></div>
+                    <div class="row-line"><span class="k">Agent args</span><span class="v" x-text="(selectedAgent.agentArgs || selectedAgent.claudeArgs || []).join(' ') || '(default)'"></span></div>
                     <div class="row-line"><span class="k">Extra env</span><span class="v" :class="{ muted: !(selectedAgent.extraEnv && selectedAgent.extraEnv.length) }" x-text="formatExtraEnv(selectedAgent.extraEnv)"></span></div>
                     <div class="row-line"><span class="k">Auth override</span><span class="v" :class="{ muted: !selectedAgent.hasAuthOverride }" x-text="selectedAgent.hasAuthOverride ? 'yes' : 'no (runner default)'"></span></div>
                     <div class="row-line"><span class="k">Base URL ovr</span><span class="v" :class="{ muted: !selectedAgent.hasBaseOverride }" x-text="selectedAgent.hasBaseOverride ? 'yes' : 'no (runner default)'"></span></div>
@@ -355,6 +362,20 @@
                         <input type="text" x-model="form.name" placeholder="auto-generated if empty"
                                :disabled="modalMode === 'edit'" />
                         <div class="hint" x-show="modalMode === 'edit'">Name can't be changed.</div>
+                    </div>
+                    <div class="field">
+                        <label>AGENT_TYPE</label>
+                        <div class="type-selector" role="radiogroup" aria-label="Agent type">
+                            <button type="button" class="type-option" role="radio"
+                                    :class="{ active: form.agentType === 'claude' }"
+                                    :aria-checked="form.agentType === 'claude'"
+                                    @click="form.agentType = 'claude'">Claude</button>
+                            <button type="button" class="type-option" role="radio"
+                                    :class="{ active: form.agentType === 'codex' }"
+                                    :aria-checked="form.agentType === 'codex'"
+                                    @click="form.agentType = 'codex'">Codex</button>
+                        </div>
+                        <div class="hint" x-text="form.agentType === 'codex' ? 'Starts Codex CLI in the web terminal.' : 'Starts Claude CLI in the web terminal.'"></div>
                     </div>
                     <div class="row">
                         <div class="field">
@@ -605,10 +626,12 @@
                         </div>
                     </div>
                     <div class="field">
-                        <label>Claude args</label>
+                        <label>Agent args</label>
                         <input type="text" x-model="form.claudeArgsText"
-                               placeholder="e.g. --resume sessid" />
-                        <div class="hint">Appended to <code>claude --dangerously-skip-permissions --allowedTools Edit,Write,Bash …</code>. Whitespace separated.</div>
+                               :placeholder="form.agentType === 'codex' ? 'e.g. --search' : 'e.g. --resume sessid'" />
+                        <div class="hint">
+                            Appended to <code x-text="form.agentType === 'codex' ? 'codex --dangerously-bypass-approvals-and-sandbox …' : 'claude --dangerously-skip-permissions --allowedTools Edit,Write,Bash …'"></code>. Whitespace separated.
+                        </div>
                     </div>
                     <div class="field">
                         <label>ANTHROPIC_AUTH_TOKEN (override)</label>
@@ -741,6 +764,7 @@ function agentApp() {
             id: null,
             name: '',
             agentId: '',
+            agentType: 'claude',
             variant: 'default',
             projectId: '',
             workspaceId: '',
@@ -761,6 +785,7 @@ function agentApp() {
                 id: null,
                 name: '',
                 agentId: '',
+                agentType: 'claude',
                 variant: 'default',
                 projectId: '',
                 workspaceId: '',
@@ -912,7 +937,7 @@ function agentApp() {
             if (!q) return this.agents;
             return this.agents.filter(a => {
                 const hay = [
-                    a.name, a.agentId, a.projectId, a.workspaceId, a.variant, a.status,
+                    a.name, a.agentId, a.agentType, a.projectId, a.workspaceId, a.variant, a.status,
                 ].filter(Boolean).join(' ').toLowerCase();
                 return hay.includes(q);
             });
@@ -1035,6 +1060,7 @@ function agentApp() {
                 id: agent.id,
                 name: agent.name || '',
                 agentId: agent.agentId || '',
+                agentType: agent.agentType || 'claude',
                 variant: agent.variant || 'default',
                 projectId: agent.projectId || '',
                 workspaceId: agent.workspaceId || '',
@@ -1079,6 +1105,7 @@ function agentApp() {
                 extraEnv.push({ key, value: e.value || '' });
             }
             const payload = {
+                agentType: this.form.agentType,
                 variant: this.form.variant === 'default' ? '' : this.form.variant,
                 agentId: this.form.agentId.trim(),
                 projectId: this.form.projectId.trim(),
@@ -1089,7 +1116,7 @@ function agentApp() {
                 agentsHome: this.form.agentsHome.trim(),
                 agentsHub: this.form.agentsHub.trim(),
                 claudeConfig: this.form.claudeConfig.trim(),
-                claudeArgs,
+                agentArgs: claudeArgs,
                 extraEnv,
             };
             if (this.form.name.trim()) payload.name = this.form.name.trim();
@@ -1149,7 +1176,7 @@ function agentApp() {
         },
 
         async restartAgent(agent) {
-            if (!confirm('Restart agent "' + agent.name + '"? Existing claude session will be killed.')) return;
+            if (!confirm('Restart agent "' + agent.name + '"? Existing ' + (agent.agentType || 'claude') + ' session will be killed.')) return;
             try {
                 const resp = await fetch('/api/agents/' + agent.id + '/restart', { method: 'POST' });
                 if (!resp.ok) {

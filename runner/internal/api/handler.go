@@ -104,7 +104,10 @@ func (h *Handler) StopAgent(w http.ResponseWriter, r *http.Request) {
 }
 
 func reqToOpts(req CreateAgentRequest) docker.CreateAgentOpts {
-	args := req.ClaudeArgs
+	args := req.AgentArgs
+	if args == nil {
+		args = req.ClaudeArgs
+	}
 	cleaned := args[:0]
 	for _, a := range args {
 		a = strings.TrimSpace(a)
@@ -119,6 +122,7 @@ func reqToOpts(req CreateAgentRequest) docker.CreateAgentOpts {
 	return docker.CreateAgentOpts{
 		Name:               strings.TrimSpace(req.Name),
 		AgentID:            strings.TrimSpace(req.AgentID),
+		AgentType:          strings.ToLower(strings.TrimSpace(req.AgentType)),
 		Variant:            strings.TrimSpace(req.Variant),
 		Image:              strings.TrimSpace(req.Image),
 		ProjectID:          strings.TrimSpace(req.ProjectID),
@@ -131,7 +135,7 @@ func reqToOpts(req CreateAgentRequest) docker.CreateAgentOpts {
 		ClaudeConfig:       strings.TrimSpace(req.ClaudeConfig),
 		AnthropicAuthToken: req.AnthropicAuthToken,
 		AnthropicBaseURL:   req.AnthropicBaseURL,
-		ClaudeArgs:         cleaned,
+		AgentArgs:          cleaned,
 		ExtraEnv:           extraEnv,
 	}
 }
@@ -330,6 +334,7 @@ func agentToResponse(a *docker.Agent) AgentResponse {
 		ID:              a.ID,
 		Name:            a.Name,
 		AgentID:         a.AgentID,
+		AgentType:       a.AgentType,
 		Status:          a.Status,
 		TTYDURL:         "/proxy/" + a.ID + "/",
 		CreatedAt:       formatTime(a.CreatedAt),
@@ -344,6 +349,7 @@ func agentToResponse(a *docker.Agent) AgentResponse {
 		AgentsHub:       a.AgentsHub,
 		ClaudeConfig:    a.ClaudeConfig,
 		ClaudeArgs:      a.ClaudeArgs,
+		AgentArgs:       a.AgentArgs,
 		HasAuthOverride: a.HasAuthOverride,
 		HasBaseOverride: a.HasBaseOverride,
 	}

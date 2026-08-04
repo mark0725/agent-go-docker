@@ -14,6 +14,7 @@ type EnvVar struct {
 type CreateAgentRequest struct {
 	Name               string   `json:"name"`
 	AgentID            string   `json:"agentId,omitempty"`
+	AgentType          string   `json:"agentType,omitempty"`
 	Variant            string   `json:"variant,omitempty"`
 	Image              string   `json:"image,omitempty"`
 	ProjectID          string   `json:"projectId,omitempty"`
@@ -27,6 +28,7 @@ type CreateAgentRequest struct {
 	AnthropicAuthToken string   `json:"anthropicAuthToken,omitempty"`
 	AnthropicBaseURL   string   `json:"anthropicBaseUrl,omitempty"`
 	ClaudeArgs         []string `json:"claudeArgs,omitempty"`
+	AgentArgs          []string `json:"agentArgs,omitempty"`
 	ExtraEnv           []EnvVar `json:"extraEnv,omitempty"`
 }
 
@@ -34,6 +36,7 @@ type AgentResponse struct {
 	ID              string   `json:"id"`
 	Name            string   `json:"name"`
 	AgentID         string   `json:"agentId,omitempty"`
+	AgentType       string   `json:"agentType"`
 	Status          string   `json:"status"`
 	TTYDURL         string   `json:"ttydUrl"`
 	CreatedAt       string   `json:"createdAt"`
@@ -48,6 +51,7 @@ type AgentResponse struct {
 	AgentsHub       string   `json:"agentsHub,omitempty"`
 	ClaudeConfig    string   `json:"claudeConfig,omitempty"`
 	ClaudeArgs      []string `json:"claudeArgs,omitempty"`
+	AgentArgs       []string `json:"agentArgs,omitempty"`
 	ExtraEnv        []EnvVar `json:"extraEnv,omitempty"`
 	HasAuthOverride bool     `json:"hasAuthOverride,omitempty"`
 	HasBaseOverride bool     `json:"hasBaseOverride,omitempty"`
@@ -68,20 +72,20 @@ type ErrorResponse struct {
 // ConfigResponse exposes runtime defaults used by the frontend to render
 // placeholders that reflect what a path will actually be if left blank.
 type ConfigResponse struct {
-	HostHome           string `json:"hostHome"`
-	AgentID            string `json:"agentId,omitempty"`
-	ProjectRoot        string `json:"projectRoot"`
-	ProjectHome        string `json:"projectHome,omitempty"`
-	ClaudeHome         string `json:"claudeHome,omitempty"`
-	CodexHome          string `json:"codexHome,omitempty"`
-	AgentsHome         string `json:"agentsHome,omitempty"`
-	AgentsHub          string `json:"agentsHub,omitempty"`
-	ClaudeConfig       string `json:"claudeConfig,omitempty"`
-	ImageRegistry      string `json:"imageRegistry"`
-	ImageTag           string `json:"imageTag"`
-	HasAuthDefault     bool   `json:"hasAuthDefault,omitempty"`
-	HasBaseURLDefault  bool   `json:"hasBaseUrlDefault,omitempty"`
-	AnthropicBaseURL   string `json:"anthropicBaseUrl,omitempty"`
+	HostHome          string `json:"hostHome"`
+	AgentID           string `json:"agentId,omitempty"`
+	ProjectRoot       string `json:"projectRoot"`
+	ProjectHome       string `json:"projectHome,omitempty"`
+	ClaudeHome        string `json:"claudeHome,omitempty"`
+	CodexHome         string `json:"codexHome,omitempty"`
+	AgentsHome        string `json:"agentsHome,omitempty"`
+	AgentsHub         string `json:"agentsHub,omitempty"`
+	ClaudeConfig      string `json:"claudeConfig,omitempty"`
+	ImageRegistry     string `json:"imageRegistry"`
+	ImageTag          string `json:"imageTag"`
+	HasAuthDefault    bool   `json:"hasAuthDefault,omitempty"`
+	HasBaseURLDefault bool   `json:"hasBaseUrlDefault,omitempty"`
+	AnthropicBaseURL  string `json:"anthropicBaseUrl,omitempty"`
 }
 
 func formatTime(t time.Time) string {

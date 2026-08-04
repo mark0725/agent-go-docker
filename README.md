@@ -183,6 +183,7 @@ Once enabled, all `/api/*`, `/proxy/*`, and UI endpoints require authentication.
 - `LISTEN_ADDR`: HTTP listen address, default `:8080`.
 - `DOCKER_SOCK`: Host Docker socket, default `/var/run/docker.sock`.
 - `AGENT_ID`: Default `AGENT_ID` injected into agent containers; used when the creation form field is left blank, default `default`.
+- `AGENT_TYPE`: Per-container agent selected by the runner form/API. Supported values are `claude` (default) and `codex`.
 - `HOST_UID` / `HOST_GID`: Host UID/GID passed through to agent containers, preventing workspace files from being owned by root. Recommended: `$(id -u)` / `$(id -g)`.
 - `AGENT_IMAGE_REGISTRY` / `AGENT_IMAGE_TAG`: Agent image and tag.
 - `RUNNER_AUTH_TOKEN`: Shared token for accessing runner pages and APIs, default empty (no authentication). See "Authentication" above.
@@ -205,10 +206,11 @@ Each agent container mounts `/data/work/{PROJECT_ID}/{WORKSPACE_ID}` as its work
 
 ### Form Field Directory Sources
 
-The create/edit agent form provides autocomplete suggestions for the following fields:
+The create/edit agent form provides selectors for the following fields:
 
-- **AGENT_ID**: Lists directory names under `/data/hub/agents` on the host.
-- **Project ID**: Lists directory names under `PROJECT_ROOT` (default `/data/work`) on the host.
-- **Workspace ID**: Lists directory names under `PROJECT_ROOT/{projectId}` on the host; updated dynamically as Project ID changes.
+- **AGENT_TYPE**: Selects Claude or Codex. Claude starts with `--dangerously-skip-permissions`; Codex starts with `--dangerously-bypass-approvals-and-sandbox` inside the agent container.
+- **AGENT_ID**: Supports free-text input and suggestions from directory names under `/data/hub/agents` on the host.
+- **Project ID**: Searchable selector populated from directory names under `PROJECT_ROOT` (default `/data/work`).
+- **Workspace ID**: Selector populated from directory names under `PROJECT_ROOT/{projectId}`; updated dynamically as Project ID changes.
 
-All three fields also accept free-text input.
+The selected type is stored in the container as the `AGENT_TYPE` environment variable and the `agent-go-runner.agent-type` Docker label. Existing runner containers without this label are treated as Claude agents.

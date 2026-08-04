@@ -28,6 +28,7 @@ type Agent struct {
 	ID              string    `json:"id"`
 	Name            string    `json:"name"`
 	AgentID         string    `json:"agentId,omitempty"`
+	AgentType       string    `json:"agentType"`
 	Status          string    `json:"status"`
 	CreatedAt       time.Time `json:"createdAt"`
 	Image           string    `json:"image"`
@@ -41,6 +42,7 @@ type Agent struct {
 	AgentsHub       string    `json:"agentsHub,omitempty"`
 	ClaudeConfig    string    `json:"claudeConfig,omitempty"`
 	ClaudeArgs      []string  `json:"claudeArgs,omitempty"`
+	AgentArgs       []string  `json:"agentArgs,omitempty"`
 	ExtraEnv        []EnvVar  `json:"extraEnv,omitempty"`
 	HasAuthOverride bool      `json:"hasAuthOverride,omitempty"`
 	HasBaseOverride bool      `json:"hasBaseOverride,omitempty"`
@@ -89,6 +91,7 @@ func (m *Manager) EnsureNetwork(ctx context.Context, name string) error {
 type CreateAgentOpts struct {
 	Name               string   `json:"name"`
 	AgentID            string   `json:"agentId,omitempty"`
+	AgentType          string   `json:"agentType,omitempty"`
 	Variant            string   `json:"variant,omitempty"`
 	Image              string   `json:"image,omitempty"`
 	ProjectID          string   `json:"projectId,omitempty"`
@@ -102,6 +105,7 @@ type CreateAgentOpts struct {
 	AnthropicAuthToken string   `json:"anthropicAuthToken,omitempty"`
 	AnthropicBaseURL   string   `json:"anthropicBaseUrl,omitempty"`
 	ClaudeArgs         []string `json:"claudeArgs,omitempty"`
+	AgentArgs          []string `json:"agentArgs,omitempty"`
 	// ExtraEnv holds user-defined KEY=VALUE pairs to inject into the
 	// container. nil means "inherit from previous agent" (used by edit),
 	// an empty (non-nil) slice means "explicitly clear", and a populated
@@ -224,19 +228,24 @@ func (m *Manager) CreateAgent(ctx context.Context, opts CreateAgentOpts) (*Agent
 	}
 	opts.AgentID = agentID
 
+	agentType, err := normalizeAgentType(opts.AgentType)
+	if err != nil {
+		return nil, err
+	}
+	opts.AgentType = agentType
+	if opts.AgentArgs == nil {
+		opts.AgentArgs = opts.ClaudeArgs
+	}
+
 	containerName := fmt.Sprintf("runner-%s-%d", sanitizeName(opts.Name), time.Now().UnixMilli())
 
-	// Compose the claude command with optional extra args (e.g. --resume <id>).
-	claudeCmdTokens := []string{
-		"claude",
-		"--dangerously-skip-permissions",
-		"--allowedTools", "Edit,Write,Bash",
-	}
-	claudeCmdTokens = append(claudeCmdTokens, opts.ClaudeArgs...)
-	claudeCmd := joinShellQuoted(claudeCmdTokens)
-	wrappedClaudeCmd := "bash -lc " + shellSingleQuote(". /tmp/agent-env.sh && exec "+claudeCmd)
+	// Compose the selected interactive agent command with optional extra args.
+	agentCmdTokens := defaultAgentCommand(agentType)
+	agentCmdTokens = append(agentCmdTokens, opts.AgentArgs...)
+	agentCmd := joinShellQuoted(agentCmdTokens)
+	wrappedAgentCmd := "bash -lc " + shellSingleQuote(". /tmp/agent-env.sh && exec "+agentCmd)
 
-	startupScript := buildStartupScript(wrappedClaudeCmd, containerWorkspace, AgentTtydPort)
+	startupScript := buildStartupScript(wrappedAgentCmd, containerWorkspace, AgentTtydPort, agentType)
 
 	authToken := opts.AnthropicAuthToken
 	hasAuthOverride := authToken != ""
@@ -249,7 +258,7 @@ func (m *Manager) CreateAgent(ctx context.Context, opts CreateAgentOpts) (*Agent
 		baseURL = m.cfg.AnthropicBaseURL
 	}
 
-	claudeArgsLabel, _ := json.Marshal(opts.ClaudeArgs)
+	agentArgsLabel, _ := json.Marshal(opts.AgentArgs)
 	extraEnv, err := validateExtraEnv(opts.ExtraEnv)
 	if err != nil {
 		return nil, err
@@ -264,11 +273,12 @@ func (m *Manager) CreateAgent(ctx context.Context, opts CreateAgentOpts) (*Agent
 		"--label", LabelManaged + "=true",
 		"--label", LabelName + "=" + opts.Name,
 		"--label", LabelAgentID + "=" + agentID,
+		"--label", LabelAgentType + "=" + agentType,
 		"--label", LabelVariant + "=" + opts.Variant,
 		"--label", LabelProjectID + "=" + projectID,
 		"--label", LabelWorkspaceID + "=" + workspaceID,
 		"--label", LabelImage + "=" + image,
-		"--label", LabelClaudeArgs + "=" + string(claudeArgsLabel),
+		"--label", LabelAgentArgs + "=" + string(agentArgsLabel),
 		"--label", LabelHasAuthOvr + "=" + boolStr(hasAuthOverride),
 		"--label", LabelHasBaseOvr + "=" + boolStr(hasBaseOverride),
 		"--label", LabelProjectHome + "=" + paths.ProjectHome,
@@ -284,6 +294,7 @@ func (m *Manager) CreateAgent(ctx context.Context, opts CreateAgentOpts) (*Agent
 		"-e", "HOME=/home/node",
 		"-e", "XDG_RUNTIME_DIR=/tmp/runtime-node",
 		"-e", "AGENT_ID=" + agentID,
+		"-e", "AGENT_TYPE=" + agentType,
 		"-e", "PROJECT_ID=" + projectID,
 		"-e", "WORKSPACE_ID=" + workspaceID,
 		"-e", "AGENT_WORKSPACE=" + containerWorkspace,
@@ -346,6 +357,7 @@ func (m *Manager) CreateAgent(ctx context.Context, opts CreateAgentOpts) (*Agent
 		ID:              containerID[:12],
 		Name:            opts.Name,
 		AgentID:         agentID,
+		AgentType:       agentType,
 		Status:          "running",
 		CreatedAt:       time.Now(),
 		Image:           image,
@@ -358,7 +370,8 @@ func (m *Manager) CreateAgent(ctx context.Context, opts CreateAgentOpts) (*Agent
 		AgentsHome:      paths.AgentsHome,
 		AgentsHub:       paths.AgentsHub,
 		ClaudeConfig:    paths.ClaudeConfig,
-		ClaudeArgs:      opts.ClaudeArgs,
+		ClaudeArgs:      opts.AgentArgs,
+		AgentArgs:       opts.AgentArgs,
 		ExtraEnv:        extraEnv,
 		HasAuthOverride: hasAuthOverride,
 		HasBaseOverride: hasBaseOverride,
@@ -379,6 +392,9 @@ func (m *Manager) RecreateAgent(ctx context.Context, id string, opts CreateAgent
 	}
 	if opts.AgentID == "" {
 		opts.AgentID = prev.AgentID
+	}
+	if opts.AgentType == "" {
+		opts.AgentType = prev.AgentType
 	}
 	if opts.Variant == "" {
 		opts.Variant = prev.Variant
@@ -407,8 +423,8 @@ func (m *Manager) RecreateAgent(ctx context.Context, id string, opts CreateAgent
 	if opts.ClaudeConfig == "" {
 		opts.ClaudeConfig = prev.ClaudeConfig
 	}
-	if opts.ClaudeArgs == nil {
-		opts.ClaudeArgs = prev.ClaudeArgs
+	if opts.AgentArgs == nil && opts.ClaudeArgs == nil {
+		opts.AgentArgs = prev.AgentArgs
 	}
 	if opts.ExtraEnv == nil {
 		opts.ExtraEnv = prev.ExtraEnv
@@ -514,9 +530,13 @@ func (m *Manager) ListAgents(ctx context.Context) ([]*Agent, error) {
 			labels = map[string]string{}
 		}
 
-		var claudeArgs []string
-		if v := labels[LabelClaudeArgs]; v != "" {
-			_ = json.Unmarshal([]byte(v), &claudeArgs)
+		var agentArgs []string
+		if v := firstNonEmpty(labels[LabelAgentArgs], labels[LabelClaudeArgs]); v != "" {
+			_ = json.Unmarshal([]byte(v), &agentArgs)
+		}
+		agentType := labels[LabelAgentType]
+		if agentType == "" {
+			agentType = "claude"
 		}
 
 		var extraEnv []EnvVar
@@ -530,6 +550,7 @@ func (m *Manager) ListAgents(ctx context.Context) ([]*Agent, error) {
 			ID:              shortID(raw.ID),
 			Name:            labels[LabelName],
 			AgentID:         labels[LabelAgentID],
+			AgentType:       agentType,
 			Status:          raw.State.Status,
 			CreatedAt:       createdAt,
 			Image:           raw.Config.Image,
@@ -542,7 +563,8 @@ func (m *Manager) ListAgents(ctx context.Context) ([]*Agent, error) {
 			AgentsHome:      labels[LabelAgentsHome],
 			AgentsHub:       labels[LabelAgentsHub],
 			ClaudeConfig:    labels[LabelClaudeConfig],
-			ClaudeArgs:      claudeArgs,
+			ClaudeArgs:      agentArgs,
+			AgentArgs:       agentArgs,
 			ExtraEnv:        extraEnv,
 			HasAuthOverride: labels[LabelHasAuthOvr] == "true",
 			HasBaseOverride: labels[LabelHasBaseOvr] == "true",
@@ -657,17 +679,36 @@ func joinShellQuoted(tokens []string) string {
 	return strings.Join(parts, " ")
 }
 
+func defaultAgentCommand(agentType string) []string {
+	if agentType == "codex" {
+		return []string{"codex", "--dangerously-bypass-approvals-and-sandbox"}
+	}
+	return []string{"claude", "--dangerously-skip-permissions", "--allowedTools", "Edit,Write,Bash"}
+}
+
+func normalizeAgentType(value string) (string, error) {
+	agentType := strings.ToLower(strings.TrimSpace(value))
+	if agentType == "" {
+		return "claude", nil
+	}
+	if agentType != "claude" && agentType != "codex" {
+		return "", fmt.Errorf("unsupported agentType %q (allowed: claude, codex)", value)
+	}
+	return agentType, nil
+}
+
 // buildStartupScript renders the in-container bootstrap that starts a shpool
-// session running claude, then exposes it via ttyd on the chosen port.
+// session running the selected agent, then exposes it via ttyd on the chosen port.
 //
 // ttyd is launched with `-t scrollback=10000` so the xterm.js client keeps
 // up to 10k lines of history on the browser side. The shpool side is bounded
 // by `output_spool_lines` in /etc/shpool/config.toml.
-func buildStartupScript(wrappedClaudeCmd, workspace string, port int) string {
+func buildStartupScript(wrappedAgentCmd, workspace string, port int, sessionName string) string {
 	return fmt.Sprintf(
-		`export CLAUDE_CMD=%s; export AGENT_WORKSPACE=%s; export TERM="${TERM:-xterm-256color}"; export COLORTERM="${COLORTERM:-truecolor}"; export FORCE_COLOR="${FORCE_COLOR:-3}"; mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR" && (umask 077; export -p > /tmp/agent-env.sh) && shpool attach -b -f --dir "$AGENT_WORKSPACE" -c "$CLAUDE_CMD" claude && for i in $(seq 1 50); do shpool list >/dev/null 2>&1 && break; sleep 0.1; done && printf '%%s\n' '#!/bin/bash' 'exec shpool attach -f claude' > /tmp/agent-cc-web-shpool && chmod +x /tmp/agent-cc-web-shpool && exec /usr/local/bin/ttyd -p %d -W -t scrollback=10000 /tmp/agent-cc-web-shpool`,
-		shellSingleQuote(wrappedClaudeCmd),
+		`export AGENT_CMD=%s; export AGENT_WORKSPACE=%s; export AGENT_SESSION=%s; export TERM="${TERM:-xterm-256color}"; export COLORTERM="${COLORTERM:-truecolor}"; export FORCE_COLOR="${FORCE_COLOR:-3}"; mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR" && (umask 077; export -p > /tmp/agent-env.sh) && shpool attach -b -f --dir "$AGENT_WORKSPACE" -c "$AGENT_CMD" "$AGENT_SESSION" && for i in $(seq 1 50); do shpool list >/dev/null 2>&1 && break; sleep 0.1; done && printf '%%s\n' '#!/bin/bash' "exec shpool attach -f $AGENT_SESSION" > /tmp/agent-web-shpool && chmod +x /tmp/agent-web-shpool && exec /usr/local/bin/ttyd -p %d -W -t scrollback=10000 /tmp/agent-web-shpool`,
+		shellSingleQuote(wrappedAgentCmd),
 		shellSingleQuote(workspace),
+		shellSingleQuote(sessionName),
 		port,
 	)
 }
