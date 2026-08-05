@@ -3,6 +3,8 @@ package docker
 import (
 	"strings"
 	"testing"
+
+	"github.com/mark0725/agent-go-docker/runner/internal/config"
 )
 
 func TestBuildStartupScriptUsesSelectedSession(t *testing.T) {
@@ -49,5 +51,21 @@ func TestNormalizeAgentType(t *testing.T) {
 	}
 	if _, err := normalizeAgentType("other"); err == nil {
 		t.Fatal("normalizeAgentType(other) unexpectedly succeeded")
+	}
+}
+
+func TestResolveImageUsesBaseForMergedToolchains(t *testing.T) {
+	m := &Manager{cfg: &config.Config{
+		AgentImage:    "example/agent:latest",
+		ImageRegistry: "example/agent",
+	}}
+
+	for _, variant := range []string{"", "default", "go", "rust"} {
+		if got := m.resolveImage(CreateAgentOpts{Variant: variant}); got != "example/agent:latest" {
+			t.Errorf("resolveImage(variant=%q) = %q, want base image", variant, got)
+		}
+	}
+	if got := m.resolveImage(CreateAgentOpts{Variant: "java21"}); got != "example/agent:java21" {
+		t.Errorf("resolveImage(java21) = %q", got)
 	}
 }

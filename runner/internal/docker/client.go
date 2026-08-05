@@ -191,7 +191,7 @@ func (m *Manager) resolveImage(opts CreateAgentOpts) string {
 	if opts.Image != "" {
 		return opts.Image
 	}
-	if v := strings.TrimSpace(opts.Variant); v != "" && v != "default" {
+	if v := strings.TrimSpace(opts.Variant); v != "" && v != "default" && v != "go" && v != "rust" {
 		return fmt.Sprintf("%s:%s", m.cfg.ImageRegistry, v)
 	}
 	return m.cfg.AgentImage

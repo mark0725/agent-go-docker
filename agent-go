@@ -39,8 +39,6 @@ Image options:
   --java, --java17 Use java17 image
   --java21         Use java21 image
   --java25         Use java25 image
-  --go             Use go image
-  --rust           Use rust image
 
 Environment variables:
   AGENT_IMAGE_REGISTRY  Docker image registry (default: ghcr.io/mark0725/agent-go-docker)
@@ -76,12 +74,9 @@ parse_global_options() {
                 IMAGE="${IMAGE_REGISTRY}:java25"
                 shift
                 ;;
-            --go)
-                IMAGE="${IMAGE_REGISTRY}:go"
-                shift
-                ;;
-            --rust)
-                IMAGE="${IMAGE_REGISTRY}:rust"
+            # Go and Rust are included in the base image. Keep the old flags
+            # as no-ops so existing scripts do not pass them to Claude.
+            --go|--rust)
                 shift
                 ;;
             -h|--help)

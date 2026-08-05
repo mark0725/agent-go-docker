@@ -749,7 +749,7 @@ function agentApp() {
             anthropicBaseUrl: '',
         },
 
-        variants: ['default', 'java8', 'java17', 'java21', 'java25', 'go', 'rust'],
+        variants: ['default', 'java8', 'java17', 'java21', 'java25'],
 
         listAgentIds: [],
         listProjects: [],
@@ -1061,7 +1061,7 @@ function agentApp() {
                 name: agent.name || '',
                 agentId: agent.agentId || '',
                 agentType: agent.agentType || 'claude',
-                variant: agent.variant || 'default',
+                variant: ['go', 'rust'].includes(agent.variant) ? 'default' : (agent.variant || 'default'),
                 projectId: agent.projectId || '',
                 workspaceId: agent.workspaceId || '',
                 projectHome: agent.projectHome || '',

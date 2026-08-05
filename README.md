@@ -4,7 +4,8 @@ Docker images for launching Claude Code container environments, a local startup 
 
 ## Directory Structure
 
-- `Dockerfile` / `Dockerfile.<variant>`: Base image and language-variant images.
+- `Dockerfile`: Base image with Node.js, Go, and Rust toolchains.
+- `Dockerfile.java*`: Java language-variant images built on top of the base image.
 - `agent-go`: Local startup script that installs `agent-cc` / `agent-cc-web` / `agent-cc-tmux` commands.
 - `entrypoint.sh`: Container entrypoint handling UID mapping, tmux/ttyd startup, etc.
 - `runner/`: Go-based HTTP runner providing APIs to dynamically spin up agent containers per project.
@@ -17,7 +18,7 @@ Docker images for launching Claude Code container environments, a local startup 
 docker build -t agent-go-docker:latest -f Dockerfile .
 ```
 
-To pull dependencies through a proxy, pass `--build-arg HTTP_PROXY=...`. The proxy variables are cleared at the end of the build:
+The Dockerfile uses the official Debian, crates.io, and npm sources by default. Override Debian with `--build-arg APT_MIRROR=...`, `--build-arg APT_SECURITY_MIRROR=...`, and npm with `--build-arg NPM_REGISTRY=...` when needed. `build.sh` passes USTC's HTTP Debian mirrors and `registry.npmmirror.com` for faster builds in China. To pull dependencies through a proxy, pass `--build-arg HTTP_PROXY=...`. The proxy variables are cleared at the end of the build:
 
 ```bash
 docker build --build-arg HTTP_PROXY=http://10.1.2.12:8118 \
@@ -31,9 +32,14 @@ docker build -t agent-go-docker:java8  -f Dockerfile.java8 .
 docker build -t agent-go-docker:java17 -f Dockerfile.java17 .
 docker build -t agent-go-docker:java21 -f Dockerfile.java21 .
 docker build -t agent-go-docker:java25 -f Dockerfile.java25 .
-docker build -t agent-go-docker:go     -f Dockerfile.go .
-docker build -t agent-go-docker:rust   -f Dockerfile.rust .
 ```
+
+Go and Rust are included in `agent-go-docker:latest`; separate `go` and `rust` image variants are no longer required. Rust is installed globally under `/usr/local/cargo` and `/usr/local/rustup`, so every container user shares the same toolchain.
+The legacy `agent-cc --go` and `agent-cc --rust` flags remain accepted as compatibility no-ops and use the base image.
+
+`build.sh` publishes both amd64 and arm64 by default. For a faster local/single-architecture build, set `PLATFORM`, for example `PLATFORM=linux/amd64 ./build.sh`. Successful builds publish reusable BuildKit caches alongside each image tag.
+
+The registry host is automatically added to `NO_PROXY`/`no_proxy`, so local image and cache pushes bypass the download proxy. Set `REGISTRY_CACHE=0` to skip remote cache import/export and push only the images, which is useful when the registry does not support BuildKit cache manifests or cache uploads are too large.
 
 ### Build the Runner Image
 
@@ -76,8 +82,6 @@ agent-cc --java8
 agent-cc --java
 agent-cc --java21
 agent-cc --java25
-agent-cc --go
-agent-cc --rust
 ```
 
 `--java` is equivalent to `--java17`.
