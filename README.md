@@ -65,15 +65,24 @@ export PATH="$HOME/.local/bin:$PATH"
 
 After installation the following commands are available:
 
-- `agent-cc`: Launch Claude Code interactive CLI
-- `agent-cc-web`: Launch ttyd web terminal + tmux
-- `agent-cc-tmux`: Launch Claude Code inside tmux
+- `agent-cc`: Launch the selected agent CLI interactively
+- `agent-cc-web`: Launch the selected agent in a ttyd web terminal
+- `agent-cc-tmux`: Launch the selected agent inside a shpool session
 
 ### 2. Basic Launch
 
 ```bash
 agent-cc
 ```
+
+Claude is used by default. Select Codex with `AGENT_TYPE`:
+
+```bash
+AGENT_TYPE=codex agent-cc
+AGENT_TYPE=codex agent-cc-web
+```
+
+Claude starts with `--dangerously-skip-permissions`; Codex starts with `--dangerously-bypass-approvals-and-sandbox` inside the agent container.
 
 ### 3. Select an Image Variant
 
@@ -86,10 +95,11 @@ agent-cc --java25
 
 `--java` is equivalent to `--java17`.
 
-### 4. Pass Claude Arguments
+### 4. Pass Agent Arguments
 
 ```bash
 agent-cc -p 'Help me review the code in the current directory'
+AGENT_TYPE=codex agent-cc --search
 ```
 
 ### 5. Web / tmux Mode
@@ -103,8 +113,10 @@ agent-cc-tmux
 
 ```bash
 export AGENT_ID=default
+export AGENT_TYPE=claude  # claude or codex
 export AGENT_IMAGE_REGISTRY=ghcr.io/mark0725/agent-go-docker
 export CLAUDE_HOME=$HOME/.claude
+export CODEX_HOME=$HOME/.codex
 export AGENTS_HOME=$HOME/.agents
 export AGENTS_HUB=$HOME/.agents-hub
 ```
@@ -118,9 +130,11 @@ docker run -it --rm --network=host \
   -e "HOST_GID=$(id -g)" \
   -e "HOME=/home/node" \
   -e "AGENT_ID=default" \
+  -e "AGENT_TYPE=claude" \
   -v node_home:/home/node \
   -v "$PWD:/workspace/$(pwd | sed 's#/#_#g')" \
   -v "$HOME/.claude:/home/node/.claude" \
+  -v "$HOME/.codex:/home/node/.codex" \
   -v "$HOME/.agents:/home/node/.agents" \
   -v "$HOME/.agents-hub:/home/node/.agents-hub" \
   -w "/workspace/$(pwd | sed 's#/#_#g')" \

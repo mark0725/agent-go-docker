@@ -7,9 +7,11 @@ IMAGE="${IMAGE_REGISTRY}:latest"
 
 PROJECT_ID="${PROJECT_ID:-$(pwd | sed 's#/#_#g')}"
 AGENT_ID="${AGENT_ID:-default}"
+AGENT_TYPE="${AGENT_TYPE:-claude}"
 
 PROJECT_HOME="${PROJECT_HOME:-$(pwd)}"
 CLAUDE_HOME="${CLAUDE_HOME:-${HOME}/.claude}"
+CODEX_HOME="${CODEX_HOME:-${HOME}/.codex}"
 AGENTS_HOME="${AGENTS_HOME:-${HOME}/.agents}"
 AGENTS_HUB="${AGENTS_HUB:-${HOME}/.agents-hub}"
 AGENT_WORKSPACE="${AGENT_WORKSPACE:-/workspace/${PROJECT_ID}}"
@@ -23,15 +25,23 @@ DOCKER_SOCK="${DOCKER_SOCK:-/var/run/docker.sock}"
 
 REMAINING_ARGS=()
 
+case "${AGENT_TYPE}" in
+    claude|codex) ;;
+    *)
+        echo "Unsupported AGENT_TYPE: ${AGENT_TYPE} (allowed: claude, codex)" >&2
+        exit 1
+        ;;
+esac
+
 usage() {
     cat <<EOF
 Usage: agent-go <command> [options]
        (or invoke via symlinks: agent-cc, agent-cc-web, agent-cc-tmux)
 
 Commands:
-  agent-cc         Start claude in interactive CLI mode (default)
-  agent-cc-web     Start claude with ttyd web terminal + shpool session (background)
-  agent-cc-tmux    Start claude inside a shpool session
+  agent-cc         Start the selected agent in interactive CLI mode (default)
+  agent-cc-web     Start the selected agent with ttyd + shpool (background)
+  agent-cc-tmux    Start the selected agent inside a shpool session
   add              Create symlinks for agent commands in a directory (default: ~/.local/bin)
 
 Image options:
@@ -43,8 +53,10 @@ Image options:
 Environment variables:
   AGENT_IMAGE_REGISTRY  Docker image registry (default: ghcr.io/mark0725/agent-go-docker)
   AGENT_ID              Agent ID (default: default)
+  AGENT_TYPE            Agent CLI: claude or codex (default: claude)
   PROJECT_HOME          Host project directory (default: \$(pwd))
   CLAUDE_HOME           Claude config directory (default: ~/.claude)
+  CODEX_HOME            Codex config directory (default: ~/.codex)
   AGENTS_HOME           Agents data directory (default: ~/.agents)
   AGENTS_HUB            Agents hub directory (default: ~/.agents-hub)
   AGENT_WORKSPACE       Container workspace path (default: /workspace/\${PROJECT_ID})
@@ -109,6 +121,7 @@ append_common_docker_args() {
         -e "HOME=/home/node"
         -e "XDG_RUNTIME_DIR=/tmp/runtime-node"
         -e "AGENT_ID=${AGENT_ID}"
+        -e "AGENT_TYPE=${AGENT_TYPE}"
     )
 
     [ -n "${ANTHROPIC_AUTH_TOKEN:-}" ] && _args+=(-e "ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN}")
@@ -124,6 +137,7 @@ append_common_docker_args() {
         -v "${DOCKER_SOCK}:/var/run/docker.sock"
         -v "${PROJECT_HOME}:/workspace/${PROJECT_ID}"
         -v "${CLAUDE_HOME}:/home/node/.claude"
+        -v "${CODEX_HOME}:/home/node/.codex"
         -v "${AGENTS_HOME}:/home/node/.agents"
         -v "${AGENTS_HUB}:/home/node/.agents-hub"
         -w "${AGENT_WORKSPACE}"
@@ -143,29 +157,40 @@ run_docker_detached() {
     docker "${docker_args[@]}" "$IMAGE" "$@"
 }
 
-build_claude_cmd() {
-    local claude_cmd
-    printf -v claude_cmd '%q ' claude --dangerously-skip-permissions --allowedTools "Edit,Write,Bash" "$@"
-    claude_cmd="${claude_cmd% }"
-    printf '%s' "$claude_cmd"
+build_agent_cmd() {
+    local agent_cmd
+    if [ "${AGENT_TYPE}" = "codex" ]; then
+        printf -v agent_cmd '%q ' codex --dangerously-bypass-approvals-and-sandbox "$@"
+    else
+        printf -v agent_cmd '%q ' claude --dangerously-skip-permissions --allowedTools "Edit,Write,Bash" "$@"
+    fi
+    agent_cmd="${agent_cmd% }"
+    printf '%s' "$agent_cmd"
 }
 
 cmd_agent_cc() {
-    run_docker claude --dangerously-skip-permissions --allowedTools "Edit,Write,Bash" "$@"
+    if [ "${AGENT_TYPE}" = "codex" ]; then
+        run_docker codex --dangerously-bypass-approvals-and-sandbox "$@"
+    else
+        run_docker claude --dangerously-skip-permissions --allowedTools "Edit,Write,Bash" "$@"
+    fi
 }
 
 cmd_agent_cc_tmux() {
-    local claude_cmd
-    local escaped_claude_cmd
-    claude_cmd="$(build_claude_cmd "$@")"
-    printf -v escaped_claude_cmd '%q' "$claude_cmd"
-    run_docker bash -lc "export CLAUDE_CMD=${escaped_claude_cmd}; mkdir -p \"\$XDG_RUNTIME_DIR\" && chmod 700 \"\$XDG_RUNTIME_DIR\" && exec shpool attach -f -c \"\$CLAUDE_CMD\" claude"
+    local agent_cmd
+    local escaped_agent_cmd
+    local escaped_agent_type
+    agent_cmd="$(build_agent_cmd "$@")"
+    printf -v escaped_agent_cmd '%q' "$agent_cmd"
+    printf -v escaped_agent_type '%q' "$AGENT_TYPE"
+    run_docker bash -lc "export AGENT_CMD=${escaped_agent_cmd}; export AGENT_SESSION=${escaped_agent_type}; mkdir -p \"\$XDG_RUNTIME_DIR\" && chmod 700 \"\$XDG_RUNTIME_DIR\" && exec shpool attach -f -c \"\$AGENT_CMD\" \"\$AGENT_SESSION\""
 }
 
 cmd_agent_cc_web() {
-    local claude_cmd
-    local wrapped_claude_cmd
-    local escaped_claude_cmd
+    local agent_cmd
+    local wrapped_agent_cmd
+    local escaped_agent_cmd
+    local escaped_agent_type
     local escaped_workspace
     local wrapper
     local container_id
@@ -174,13 +199,14 @@ cmd_agent_cc_web() {
     container_name="${CONTAINER_NAME:-agent-cc-web-$(date +%s)}"
     CONTAINER_NAME="$container_name"
 
-    claude_cmd="$(build_claude_cmd "$@")"
-    wrapped_claude_cmd="bash -lc $(printf '%q' ". /tmp/agent-env.sh && exec $claude_cmd")"
-    printf -v escaped_claude_cmd '%q' "$wrapped_claude_cmd"
+    agent_cmd="$(build_agent_cmd "$@")"
+    wrapped_agent_cmd="bash -lc $(printf '%q' ". /tmp/agent-env.sh && exec $agent_cmd")"
+    printf -v escaped_agent_cmd '%q' "$wrapped_agent_cmd"
+    printf -v escaped_agent_type '%q' "$AGENT_TYPE"
     printf -v escaped_workspace '%q' "$AGENT_WORKSPACE"
-    wrapper="/tmp/agent-cc-web-shpool"
+    wrapper="/tmp/agent-web-shpool"
 
-    container_id="$(run_docker_detached bash -lc "export CLAUDE_CMD=${escaped_claude_cmd}; export AGENT_WORKSPACE=${escaped_workspace}; export TERM=\"\${TERM:-xterm-256color}\"; export COLORTERM=\"\${COLORTERM:-truecolor}\"; export FORCE_COLOR=\"\${FORCE_COLOR:-3}\"; mkdir -p \"\$XDG_RUNTIME_DIR\" && chmod 700 \"\$XDG_RUNTIME_DIR\" && (umask 077; export -p > /tmp/agent-env.sh) && shpool attach -b -f --dir \"\$AGENT_WORKSPACE\" -c \"\$CLAUDE_CMD\" claude && for i in \$(seq 1 50); do shpool list >/dev/null 2>&1 && break; sleep 0.1; done && printf '%s\\n' '#!/bin/bash' 'exec shpool attach -f claude' > ${wrapper} && chmod +x ${wrapper} && exec /usr/local/bin/ttyd -p ${TTY_PORT} -W ${wrapper}")"
+    container_id="$(run_docker_detached bash -lc "export AGENT_CMD=${escaped_agent_cmd}; export AGENT_SESSION=${escaped_agent_type}; export AGENT_WORKSPACE=${escaped_workspace}; export TERM=\"\${TERM:-xterm-256color}\"; export COLORTERM=\"\${COLORTERM:-truecolor}\"; export FORCE_COLOR=\"\${FORCE_COLOR:-3}\"; mkdir -p \"\$XDG_RUNTIME_DIR\" && chmod 700 \"\$XDG_RUNTIME_DIR\" && (umask 077; export -p > /tmp/agent-env.sh) && shpool attach -b -f --dir \"\$AGENT_WORKSPACE\" -c \"\$AGENT_CMD\" \"\$AGENT_SESSION\" && for i in \$(seq 1 50); do shpool list >/dev/null 2>&1 && break; sleep 0.1; done && printf '%s\\n' '#!/bin/bash' \"exec shpool attach -f \$AGENT_SESSION\" > ${wrapper} && chmod +x ${wrapper} && exec /usr/local/bin/ttyd -p ${TTY_PORT} -W ${wrapper}")"
     echo "${container_id}"
     echo "agent-cc-web started: http://localhost:${TTY_PORT}"
     echo "container name: ${container_name}"
