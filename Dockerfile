@@ -1,8 +1,10 @@
 # syntax=docker/dockerfile:1
 
-ARG RUST_VERSION=1.85.0
+ARG RUST_VERSION=1.97.1
 
-FROM rust:${RUST_VERSION}-slim AS shpool-builder
+# Keep the builder on the same Debian release as the runtime image. Otherwise
+# shpool may link against a newer glibc and fail to start on Bookworm.
+FROM rust:${RUST_VERSION}-slim-bookworm AS shpool-builder
 
 ARG HTTP_PROXY
 ARG APT_MIRROR=
@@ -33,12 +35,10 @@ RUN if [ -n "${APT_SECURITY_MIRROR}" ]; then \
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,target=/tmp/shpool-target,sharing=locked \
-    CARGO_TARGET_DIR=/tmp/shpool-target \
     cargo install --locked shpool --root /usr/local && \
     chmod +x /usr/local/bin/shpool
 
-FROM node:24-slim
+FROM node:24-bookworm-slim
 
 ARG USER_UID=1000
 ARG USER_GID=1000
@@ -46,7 +46,7 @@ ARG TARGETARCH
 ARG DOCKER_VERSION=27.1.0
 ARG TTYD_VERSION="1.7.7"
 ARG GIT_VERSION=2.49.1
-ARG GO_VERSION=1.26.1
+ARG GO_VERSION=1.26.5
 ARG APT_MIRROR=
 ARG APT_SECURITY_MIRROR=
 ARG NPM_REGISTRY=https://registry.npmjs.org
@@ -91,6 +91,10 @@ RUN if [ -n "${APT_SECURITY_MIRROR}" ]; then \
     libexpat1-dev \
     gettext \
     tcl \
+    python3 \
+    python-is-python3 \
+    python3-pip \
+    python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fL --http1.1 --retry 8 --retry-delay 3 --retry-all-errors --connect-timeout 20 \
@@ -119,13 +123,6 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
-# ===== Python =====
-RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-venv \
-    && rm -rf /var/lib/apt/lists/*
-
 # ===== Docker CLI (可选，用于 DinD 场景) =====
 RUN curl -fL --http1.1 \
         --retry 8 --retry-delay 3 --retry-all-errors --connect-timeout 20 \
@@ -138,6 +135,7 @@ RUN curl -fL --http1.1 \
 RUN groupadd --gid 999 docker && usermod -aG docker node
 
 COPY --from=shpool-builder /usr/local/bin/shpool /usr/local/bin/shpool
+RUN shpool version
 
 # shpool 重连(刷 ttyd 页面)默认 session_restore_mode = "screen",只回放一屏。
 # output_spool_lines 只是内存缓冲上限,真正决定回放多少的是 session_restore_mode。
@@ -153,6 +151,10 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked \
 # ===== 安装 Codex =====
 RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     npm install -g --registry="${NPM_REGISTRY}" @openai/codex
+
+# Verify Node.js 24 and the Debian Bookworm-provided Python runtime before
+# adding the separately managed Go and Rust toolchains below.
+RUN node --version && npm --version && python --version && python3 --version && pip3 --version
 
 # ===== Go =====
 ENV GOPROXY=https://proxy.golang.com.cn,direct
@@ -180,7 +182,18 @@ RUN mkdir -p "${CARGO_HOME}" "${RUSTUP_HOME}" && \
         -o /tmp/rustup.sh https://sh.rustup.rs && \
     sh /tmp/rustup.sh -y --no-modify-path && \
     rm -f /tmp/rustup.sh && \
-    chmod -R a+rwX "${CARGO_HOME}" "${RUSTUP_HOME}"
+    chmod -R a+rwX "${CARGO_HOME}" "${RUSTUP_HOME}" && \
+    for binary in cargo cargo-clippy cargo-fmt clippy-driver rustc rustdoc rustfmt rustup; do \
+        ln -sf "${CARGO_HOME}/bin/${binary}" "/usr/local/bin/${binary}"; \
+    done && \
+    printf '%s\n' \
+        'export CARGO_HOME="/usr/local/cargo"' \
+        'export RUSTUP_HOME="/usr/local/rustup"' \
+        'export PATH="/usr/local/cargo/bin:/usr/local/bin:$PATH"' \
+        > /etc/profile.d/rust-path.sh && \
+    chmod 0644 /etc/profile.d/rust-path.sh && \
+    rustc --version && \
+    cargo --version
 ENV PATH="${CARGO_HOME}/bin:${PATH}"
 
 # ===== UID 映射: gosu + entrypoint =====

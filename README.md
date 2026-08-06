@@ -4,7 +4,7 @@ Docker images for launching Claude Code container environments, a local startup 
 
 ## Directory Structure
 
-- `Dockerfile`: Base image with Node.js, Go, and Rust toolchains.
+- `Dockerfile`: Node.js 24 on Debian Bookworm, with Bookworm-provided Python plus Go and Rust toolchains.
 - `Dockerfile.java*`: Java language-variant images built on top of the base image.
 - `agent-go`: Local startup script that installs `agent-cc` / `agent-cc-web` / `agent-cc-tmux` commands.
 - `entrypoint.sh`: Container entrypoint handling UID mapping, tmux/ttyd startup, etc.
@@ -34,7 +34,7 @@ docker build -t agent-go-docker:java21 -f Dockerfile.java21 .
 docker build -t agent-go-docker:java25 -f Dockerfile.java25 .
 ```
 
-Go and Rust are included in `agent-go-docker:latest`; separate `go` and `rust` image variants are no longer required. Rust is installed globally under `/usr/local/cargo` and `/usr/local/rustup`, so every container user shares the same toolchain.
+Go and Rust are included in `agent-go-docker:latest`; separate `go` and `rust` image variants are no longer required. Rust is installed globally under `/usr/local/cargo` and `/usr/local/rustup`, with its commands linked into `/usr/local/bin`, so every container user shares the same toolchain.
 The legacy `agent-cc --go` and `agent-cc --rust` flags remain accepted as compatibility no-ops and use the base image.
 
 `build.sh` publishes both amd64 and arm64 by default. For a faster local/single-architecture build, set `PLATFORM`, for example `PLATFORM=linux/amd64 ./build.sh`. Successful builds publish reusable BuildKit caches alongside each image tag.

@@ -1,9 +1,6 @@
 #!/bin/bash
 set -e
 
-# 确保 /usr/local/bin 在 PATH 中
-export PATH="/usr/local/bin:$PATH"
-
 # source agents-hub 环境变量。用 _AGENT_ENV_LOADED 作 guard：本脚本会以 root 跑一遍、
 # 再以 node 身份 re-exec 跑第二遍，guard 防止 .env 被重复 source（否则 PATH 之类会被追加两次）。
 if [ -z "${_AGENT_ENV_LOADED:-}" ]; then
@@ -19,6 +16,10 @@ if [ -z "${_AGENT_ENV_LOADED:-}" ]; then
     fi
     export _AGENT_ENV_LOADED=1
 fi
+
+# Re-assert globally installed toolchains after loading agent .env files,
+# because those files may replace PATH rather than append to it.
+export PATH="/usr/local/cargo/bin:/usr/local/go/bin:/usr/local/bin:${PATH}"
 
 # 以 root 运行且设置了 HOST_UID 时，将容器内 node 用户的 UID/GID 调整为与宿主机一致，
 # 这样容器内创建的文件在宿主机上拥有正确的属主。
